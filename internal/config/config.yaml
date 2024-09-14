@@ -1,0 +1,19 @@
+http:
+  host: 127.0.0.1
+  port: 8080
+
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  user: postgres
+  password: sa
+  db: zlib
+
+auth:
+  secret-key: secret
+
+email:
+  password: ruqs4XdcvhndKnrEjkDi
+  username: skylang@inbox.ru
+  host: smtp.mail.ru
+  port: 465
