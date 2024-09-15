@@ -1,6 +1,7 @@
 package psql
 
 import (
+	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
@@ -8,7 +9,7 @@ import (
 
 var DB *gorm.DB
 
-// Подключение к БД
+// Connect Подключение к БД
 func Connect(dsn string) error {
 	var err error
 
@@ -17,10 +18,33 @@ func Connect(dsn string) error {
 		return err
 	}
 
+	DB.Exec("CREATE TYPE role AS ENUM ('user', 'admin', 'librarian');")
+
+	err = DB.AutoMigrate(
+		&domain.User{},
+		&domain.Book{},
+		&domain.Author{},
+		&domain.Genre{},
+		&domain.Publisher{},
+		&domain.Favorite{},
+		&domain.Review{},
+		&domain.Reservation{},
+		&domain.Notification{},
+		&domain.Log{},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = DB.SetupJoinTable(&domain.Author{}, "Books", &domain.AuthorBook{})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Закрытие соединения
+// Close Закрытие соединения
 func Close() {
 	db, err := DB.DB()
 	if err != nil {
