@@ -27,6 +27,16 @@ func Run() {
 		log.Fatal("error connecting to db: ", err)
 	}
 
+	//repo := repository.NewRepository(psql.DB)
+	//
+	//usr, err := repo.AuthorRepo.GetAuthorByID(1)
+	//if err != nil {
+	//	log.Fatal("error getting user: ", err)
+	//}
+
+	//slog.Info("user", slog.Any("user", usr))
+
 	slog.Info("config", slog.Any("config", cfg))
 	slog.Info("DB connected", slog.Any("DB", psql.DB.Name()))
+	//slog.Info("repository", slog.Any("repository", repo))
 }
