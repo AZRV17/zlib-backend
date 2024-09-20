@@ -1,15 +1,14 @@
 package domain
 
 import (
-	"gorm.io/gorm"
 	"time"
 )
 
 type Log struct {
-	gorm.Model
-	UserID  uint
-	User    User
-	Action  string
-	Date    time.Time
-	Details string
+	ID      uint      `gorm:"primaryKey,autoIncrement" json:"id"`
+	UserID  uint      `json:"user_id"`
+	User    User      `json:"user"`
+	Action  string    `json:"action"`
+	Date    time.Time `json:"date"`
+	Details string    `json:"details"`
 }

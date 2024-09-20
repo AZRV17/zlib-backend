@@ -1,17 +1,18 @@
 package domain
 
 import (
-	"gorm.io/gorm"
 	"time"
 )
 
 type Reservation struct {
-	gorm.Model
-	UserID       uint
-	User         User
-	BookID       uint
-	Book         Book
-	DateOfIssue  time.Time
-	DateOfReturn time.Time
-	Status       string
+	ID           uint      `json:"id" gorm:"primaryKey,autoIncrement"`
+	UserID       uint      `json:"user_id"`
+	User         User      `json:"user" gorm:"foreignKey:UserID"`
+	BookID       uint      `json:"book_id"`
+	Book         Book      `json:"book" gorm:"foreignKey:BookID"`
+	DateOfIssue  time.Time `json:"date_of_issue"`
+	DateOfReturn time.Time `json:"date_of_return"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
 }

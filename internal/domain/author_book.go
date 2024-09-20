@@ -1,6 +1,6 @@
 package domain
 
 type AuthorBook struct {
-	AuthorID uint
-	BookID   uint
+	AuthorID uint `json:"author_id"`
+	BookID   uint `json:"book_id"`
 }

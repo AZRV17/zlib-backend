@@ -3,7 +3,7 @@ package domain
 import (
 	"database/sql/driver"
 	"fmt"
-	"gorm.io/gorm"
+	"time"
 )
 
 type Role string
@@ -15,7 +15,14 @@ const (
 )
 
 func (r *Role) Scan(value interface{}) error {
-	*r = Role(fmt.Sprintf("%s", value))
+	switch v := value.(type) {
+	case []byte:
+		*r = Role(v)
+	case string:
+		*r = Role(v)
+	default:
+		return fmt.Errorf("unsupported type: %T", v)
+	}
 	return nil
 }
 
@@ -24,16 +31,18 @@ func (r Role) Value() (driver.Value, error) {
 }
 
 type User struct {
-	gorm.Model
-	Login          string
-	Password       string
-	Role           Role `gorm:"type:role;default:'user'"`
-	Email          string
-	PhoneNumber    string
-	PassportNumber int
-	Favorites      []Favorite
-	Reservations   []Reservation
-	Reviews        []Review
-	Notifications  []Notification
-	Logs           []Log
+	ID             uint           `json:"id" gorm:"primaryKey,autoIncrement"`
+	Login          string         `json:"login" gore:"unique"`
+	Password       string         `json:"password"`
+	Role           Role           `json:"role" gorm:"type:role;default:'user'"`
+	Email          string         `json:"email" gorm:"unique"`
+	PhoneNumber    string         `json:"phoneNumber" gorm:"unique"`
+	PassportNumber int            `json:"passportNumber" gorm:"unique"`
+	Favorites      []Favorite     `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Reservations   []Reservation  `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Reviews        []Review       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Notifications  []Notification `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Logs           []Log          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	CreatedAt      time.Time      `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt      time.Time      `json:"updatedAt" gorm:"autoUpdateTime"`
 }
