@@ -13,17 +13,12 @@ func NewAuthorRepository(db *gorm.DB) *AuthorRepository {
 	return &AuthorRepository{DB: db}
 }
 
-func (a AuthorRepository) GetAuthorByID(id int) (*domain.Author, error) {
+func (a AuthorRepository) GetAuthorByID(id uint) (*domain.Author, error) {
 	var author domain.Author
 
-	tx := a.DB.Begin()
-
-	if err := tx.First(&author, id).Error; err != nil {
-		tx.Rollback()
+	if err := a.DB.First(&author, id).Error; err != nil {
 		return nil, err
 	}
-
-	tx.Commit()
 
 	return &author, nil
 }
@@ -31,68 +26,48 @@ func (a AuthorRepository) GetAuthorByID(id int) (*domain.Author, error) {
 func (a AuthorRepository) GetAuthors() ([]*domain.Author, error) {
 	var authors []*domain.Author
 
-	tx := a.DB.Begin()
-
-	if err := tx.Find(&authors).Error; err != nil {
-		tx.Rollback()
+	if err := a.DB.Find(&authors).Error; err != nil {
+		a.DB.Rollback()
 		return nil, err
 	}
-
-	tx.Commit()
 
 	return authors, nil
 }
 
 func (a AuthorRepository) CreateAuthor(author *domain.Author) error {
-	tx := a.DB.Begin()
-
-	if err := tx.Create(author).Error; err != nil {
-		tx.Rollback()
+	if err := a.DB.Create(author).Error; err != nil {
+		a.DB.Rollback()
 		return err
 	}
-
-	tx.Commit()
 
 	return nil
 }
 
 func (a AuthorRepository) UpdateAuthor(author *domain.Author) error {
-	tx := a.DB.Begin()
-
-	if err := tx.Save(author).Error; err != nil {
-		tx.Rollback()
+	if err := a.DB.Save(author).Error; err != nil {
+		a.DB.Rollback()
 		return err
 	}
-
-	tx.Commit()
 
 	return nil
 }
 
-func (a AuthorRepository) DeleteAuthor(id int) error {
-	tx := a.DB.Begin()
-
-	if err := tx.Delete(&domain.Author{}, id).Error; err != nil {
-		tx.Rollback()
+func (a AuthorRepository) DeleteAuthor(id uint) error {
+	if err := a.DB.Delete(&domain.Author{}, id).Error; err != nil {
+		a.DB.Rollback()
 		return err
 	}
-
-	tx.Commit()
 
 	return nil
 }
 
-func (a AuthorRepository) GetAuthorBooks(id int) ([]*domain.Book, error) {
+func (a AuthorRepository) GetAuthorBooks(id uint) ([]*domain.Book, error) {
 	var books []*domain.Book
 
-	tx := a.DB.Begin()
-
-	if err := tx.Model(&domain.Author{ID: id}).Association("Books").Find(&books); err != nil {
-		tx.Rollback()
+	if err := a.DB.Model(&domain.Author{ID: id}).Association("Books").Find(&books); err != nil {
+		a.DB.Rollback()
 		return nil, err
 	}
-
-	tx.Commit()
 
 	return books, nil
 }

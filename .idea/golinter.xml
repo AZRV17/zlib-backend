@@ -6,7 +6,6 @@
         <option value="staticcheck" />
         <option value="interfacer" />
         <option value="exportloopref" />
-        <option value="dupl" />
         <option value="govet" />
         <option value="errorlint" />
         <option value="funlen" />
