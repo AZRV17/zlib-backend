@@ -76,3 +76,28 @@ func (b BookRepository) GetBookByUniqueCode(code uint) (*domain.Book, error) {
 
 	return &book, nil
 }
+
+func (b BookRepository) GetGroupedBooksByTitle() ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	if err := b.DB.Select(
+		`
+				array_agg(id) as id,
+				title,
+				author_id,
+				genre_id,
+				publisher_id,
+				isbn,
+				year_of_publication,
+				picture,
+				avg(rating) as rating,
+				array_agg(unique_code) as unique_code,
+				array_egg(created_at) as created_at,
+				array_agg(updated_at) as updated_at,
+				`,
+	).Group("title").Error; err != nil {
+		return nil, err
+	}
+
+	return books, nil
+}

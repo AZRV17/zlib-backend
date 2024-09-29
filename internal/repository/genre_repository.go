@@ -48,3 +48,11 @@ func (g GenreRepository) UpdateGenre(genre *domain.Genre) error {
 
 	return nil
 }
+
+func (g GenreRepository) DeleteGenre(id uint) error {
+	if err := g.DB.Delete(&domain.Genre{}, id).Error; err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -69,10 +69,30 @@ func (u UserRepository) DeleteUser(id uint) error {
 	return nil
 }
 
-func (u UserRepository) UpdateUser(user *domain.User) error {
-	if err := u.DB.Save(user).Error; err != nil {
+func (u UserRepository) UpdateUser(user *UpdateUserDTOInput) error {
+	if err := u.DB.Where("id = ?", user.ID).Updates(user).Error; err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (u UserRepository) GetUserByLogin(login string) (*domain.User, error) {
+	var user domain.User
+
+	if err := u.DB.Where("login = ?", login).First(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (u UserRepository) GetUserByEmail(email string) (*domain.User, error) {
+	var user domain.User
+
+	if err := u.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

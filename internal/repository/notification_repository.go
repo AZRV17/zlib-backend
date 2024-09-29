@@ -43,14 +43,6 @@ func (n NotificationRepository) CreateNotification(notification *domain.Notifica
 	return nil
 }
 
-func (n NotificationRepository) UpdateNotification(notification *domain.Notification) error {
-	if err := n.DB.Save(notification).Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (n NotificationRepository) DeleteNotification(id uint) error {
 	if err := n.DB.Delete(&domain.Notification{}, id).Error; err != nil {
 		return err

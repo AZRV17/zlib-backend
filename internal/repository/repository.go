@@ -12,14 +12,9 @@ type AuthorRepo interface {
 	UpdateAuthor(author *domain.Author) error
 	DeleteAuthor(id uint) error
 	GetAuthorBooks(id uint) ([]*domain.Book, error)
-}
-
-type AuthorBookRepo interface {
-	GetAuthorBookByID(id uint) (*domain.AuthorBook, error)
-	GetAuthorBooks() ([]*domain.AuthorBook, error)
 	CreateAuthorBook(authorBook *domain.AuthorBook) error
-	UpdateAuthorBook(authorBook *domain.AuthorBook) error
 	DeleteAuthorBook(id uint) error
+	UpdateAuthorBook(authorBook *domain.AuthorBook) error
 }
 
 type BookRepo interface {
@@ -30,6 +25,7 @@ type BookRepo interface {
 	DeleteBook(id uint) error
 	GetBookByTitle(title string) (*domain.Book, error)
 	GetBookByUniqueCode(code uint) (*domain.Book, error)
+	GetGroupedBooksByTitle() ([]*domain.Book, error)
 }
 
 type FavoriteRepo interface {
@@ -44,6 +40,7 @@ type GenreRepo interface {
 	GetGenres() ([]*domain.Genre, error)
 	CreateGenre(genre *domain.Genre) error
 	UpdateGenre(genre *domain.Genre) error
+	DeleteGenre(id uint) error
 }
 
 type LogRepo interface {
@@ -59,7 +56,6 @@ type NotificationRepo interface {
 	GetNotificationByID(id uint) (*domain.Notification, error)
 	GetNotifications() ([]*domain.Notification, error)
 	CreateNotification(notification *domain.Notification) error
-	UpdateNotification(notification *domain.Notification) error
 	DeleteNotification(id uint) error
 	GetNotificationsByUserID(id uint) ([]*domain.Notification, error)
 }
@@ -89,6 +85,16 @@ type ReviewRepo interface {
 	GetReviewsByBookID(id uint) ([]*domain.Review, error)
 }
 
+type UpdateUserDTOInput struct {
+	ID             uint        `json:"id" gorm:"primaryKey,autoIncrement"`
+	Login          string      `json:"login" gore:"unique"`
+	Password       string      `json:"password"`
+	Role           domain.Role `json:"role" gorm:"type:role;default:'user'"`
+	Email          string      `json:"email" gorm:"unique"`
+	PhoneNumber    string      `json:"phoneNumber" gorm:"unique"`
+	PassportNumber int         `json:"passportNumber" gorm:"unique"`
+}
+
 type UserRepo interface {
 	GetUserByID(id uint) (*domain.User, error)
 	GetUsers() ([]*domain.User, error)
@@ -96,13 +102,14 @@ type UserRepo interface {
 	SignInByEmail(email, password string) (*domain.User, error)
 	SignUp(user *domain.User) error
 	DeleteUser(id uint) error
-	UpdateUser(user *domain.User) error
+	UpdateUser(user *UpdateUserDTOInput) error
+	GetUserByLogin(login string) (*domain.User, error)
+	GetUserByEmail(email string) (*domain.User, error)
 }
 
 type Repository struct {
 	DB *gorm.DB
 	AuthorRepo
-	AuthorBookRepo
 	BookRepo
 	FavoriteRepo
 	GenreRepo
@@ -118,7 +125,6 @@ func NewRepository(db *gorm.DB) Repository {
 	return Repository{
 		DB:               db,
 		AuthorRepo:       NewAuthorRepository(db.Model(&domain.Author{})),
-		AuthorBookRepo:   NewAuthorBookRepository(db.Model(&domain.AuthorBook{})),
 		BookRepo:         NewBookRepository(db.Model(&domain.Book{})),
 		FavoriteRepo:     NewFavoriteRepository(db.Model(&domain.Favorite{})),
 		GenreRepo:        NewGenreRepository(db.Model(&domain.Genre{})),

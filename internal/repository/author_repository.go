@@ -71,3 +71,30 @@ func (a AuthorRepository) GetAuthorBooks(id uint) ([]*domain.Book, error) {
 
 	return books, nil
 }
+
+func (a AuthorRepository) CreateAuthorBook(authorBook *domain.AuthorBook) error {
+	if err := a.DB.Model(&domain.AuthorBook{}).Create(authorBook).Error; err != nil {
+		a.DB.Rollback()
+		return err
+	}
+
+	return nil
+}
+
+func (a AuthorRepository) DeleteAuthorBook(id uint) error {
+	if err := a.DB.Delete(&domain.AuthorBook{}, id).Error; err != nil {
+		a.DB.Rollback()
+		return err
+	}
+
+	return nil
+}
+
+func (a AuthorRepository) UpdateAuthorBook(authorBook *domain.AuthorBook) error {
+	if err := a.DB.Save(authorBook).Error; err != nil {
+		a.DB.Rollback()
+		return err
+	}
+
+	return nil
+}

@@ -1,11 +1,18 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/config"
+	"github.com/AZRV17/zlib-backend/internal/delivery"
+	"github.com/AZRV17/zlib-backend/internal/repository"
+	httpserver "github.com/AZRV17/zlib-backend/internal/server/http"
+	serv "github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/AZRV17/zlib-backend/pkg/db/psql"
+	"github.com/gin-gonic/gin"
 	"log"
 	"log/slog"
+	"net/http"
 )
 
 func Run() {
@@ -27,16 +34,31 @@ func Run() {
 		log.Fatal("error connecting to db: ", err)
 	}
 
-	//repo := repository.NewRepository(psql.DB)
-	//
-	//usr, err := repo.AuthorRepo.GetAuthorByID(1)
-	//if err != nil {
-	//	log.Fatal("error getting user: ", err)
-	//}
+	repo := repository.NewRepository(psql.DB)
 
-	//slog.Info("user", slog.Any("user", usr))
+	service := serv.NewService(&repo)
 
-	slog.Info("config", slog.Any("config", cfg))
-	slog.Info("DB connected", slog.Any("DB", psql.DB.Name()))
-	//slog.Info("repository", slog.Any("repository", repo))
+	r := gin.Default()
+
+	handler := delivery.NewHandler(*service, cfg)
+
+	handler.Init(r)
+
+	server := httpserver.NewHttpServer(cfg, r)
+
+	stoppedHTTP := make(chan struct{})
+
+	go server.Shutdown(stoppedHTTP)
+
+	slog.Info("starting HTTP server", slog.Any("host", cfg.HTTP.Host), slog.Any("port", cfg.HTTP.Port))
+
+	go func() {
+		if err := server.Run(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("HTTP server ListenAndServe Error: %v", err)
+		}
+	}()
+
+	<-stoppedHTTP
+
+	slog.Info("HTTP server stopped")
 }
