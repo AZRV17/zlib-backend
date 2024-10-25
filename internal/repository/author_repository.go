@@ -26,7 +26,7 @@ func (a AuthorRepository) GetAuthorByID(id uint) (*domain.Author, error) {
 func (a AuthorRepository) GetAuthors() ([]*domain.Author, error) {
 	var authors []*domain.Author
 
-	if err := a.DB.Find(&authors).Error; err != nil {
+	if err := a.DB.Preload("Books").Find(&authors).Error; err != nil {
 		a.DB.Rollback()
 		return nil, err
 	}

@@ -15,7 +15,7 @@ type HTTPServer struct {
 	httpServer *http.Server
 }
 
-func NewHttpServer(cfg *config.Config, handler http.Handler) *HTTPServer {
+func NewHTTPServer(cfg *config.Config, handler http.Handler) *HTTPServer {
 	return &HTTPServer{
 		httpServer: &http.Server{
 			Addr:    cfg.HTTP.Host + ":" + cfg.HTTP.Port,

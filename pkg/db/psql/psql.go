@@ -23,6 +23,7 @@ func Connect(dsn string) error {
 	err = DB.AutoMigrate(
 		&domain.User{},
 		&domain.Book{},
+		&domain.UniqueCode{},
 		&domain.Author{},
 		&domain.Genre{},
 		&domain.Publisher{},
@@ -32,11 +33,6 @@ func Connect(dsn string) error {
 		&domain.Notification{},
 		&domain.Log{},
 	)
-	if err != nil {
-		return err
-	}
-
-	err = DB.SetupJoinTable(&domain.Author{}, "Books", &domain.AuthorBook{})
 	if err != nil {
 		return err
 	}

@@ -9,10 +9,12 @@ import (
 	httpserver "github.com/AZRV17/zlib-backend/internal/server/http"
 	serv "github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/AZRV17/zlib-backend/pkg/db/psql"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 func Run() {
@@ -40,11 +42,25 @@ func Run() {
 
 	r := gin.Default()
 
+	r.Use(
+		cors.New(
+			cors.Config{
+				AllowOrigins:     []string{"http://localhost:3000"},
+				AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Set-Cookie"},
+				AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+				ExposeHeaders:    []string{"Content-Length"},
+				AllowWildcard:    true,
+				AllowCredentials: true,
+				MaxAge:           12 * time.Hour,
+			},
+		),
+	)
+
 	handler := delivery.NewHandler(*service, cfg)
 
 	handler.Init(r)
 
-	server := httpserver.NewHttpServer(cfg, r)
+	server := httpserver.NewHTTPServer(cfg, r)
 
 	stoppedHTTP := make(chan struct{})
 

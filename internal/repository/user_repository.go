@@ -16,7 +16,15 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 func (u UserRepository) GetUserByID(id uint) (*domain.User, error) {
 	var user domain.User
 
-	if err := u.DB.First(&user, id).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.First(&user, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -36,7 +44,15 @@ func (u UserRepository) GetUsers() ([]*domain.User, error) {
 func (u UserRepository) SignInByLogin(login, password string) (*domain.User, error) {
 	var user domain.User
 
-	if err := u.DB.Where("login = ? AND password = ?", login, password).First(&user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("login = ? AND password = ?", login, password).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -46,7 +62,15 @@ func (u UserRepository) SignInByLogin(login, password string) (*domain.User, err
 func (u UserRepository) SignInByEmail(email, password string) (*domain.User, error) {
 	var user domain.User
 
-	if err := u.DB.Where("email = ? AND password = ?", email, password).First(&user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("email = ? AND password = ?", email, password).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -54,7 +78,15 @@ func (u UserRepository) SignInByEmail(email, password string) (*domain.User, err
 }
 
 func (u UserRepository) SignUp(user *domain.User) error {
-	if err := u.DB.Create(user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Create(user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return err
 	}
 
@@ -70,7 +102,15 @@ func (u UserRepository) DeleteUser(id uint) error {
 }
 
 func (u UserRepository) UpdateUser(user *UpdateUserDTOInput) error {
-	if err := u.DB.Where("id = ?", user.ID).Updates(user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("id = ?", user.ID).Updates(user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return err
 	}
 
@@ -80,7 +120,15 @@ func (u UserRepository) UpdateUser(user *UpdateUserDTOInput) error {
 func (u UserRepository) GetUserByLogin(login string) (*domain.User, error) {
 	var user domain.User
 
-	if err := u.DB.Where("login = ?", login).First(&user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("login = ?", login).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -90,7 +138,15 @@ func (u UserRepository) GetUserByLogin(login string) (*domain.User, error) {
 func (u UserRepository) GetUserByEmail(email string) (*domain.User, error) {
 	var user domain.User
 
-	if err := u.DB.Where("email = ?", email).First(&user).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("email = ?", email).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 

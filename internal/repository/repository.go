@@ -26,6 +26,11 @@ type BookRepo interface {
 	GetBookByTitle(title string) (*domain.Book, error)
 	GetBookByUniqueCode(code uint) (*domain.Book, error)
 	GetGroupedBooksByTitle() ([]*domain.Book, error)
+	GetBookUniqueCodes(id uint) ([]*domain.UniqueCode, error)
+	CreateUniqueCode(uniqueCode *domain.UniqueCode) error
+	DeleteUniqueCode(id uint) error
+	UpdateUniqueCode(uniqueCode *domain.UniqueCode) error
+	//GetAggregatedBooks() ([]domain.AggregatedBook, error)
 }
 
 type FavoriteRepo interface {
@@ -33,6 +38,8 @@ type FavoriteRepo interface {
 	GetFavorites() ([]*domain.Favorite, error)
 	CreateFavorite(favorite *domain.Favorite) error
 	DeleteFavorite(id uint) error
+	GetFavoritesByUserID(id uint) ([]*domain.Favorite, error)
+	DeleteFavoriteByUserIDAndBookID(userID uint, bookID uint) (*domain.Favorite, error)
 }
 
 type GenreRepo interface {
@@ -88,6 +95,7 @@ type ReviewRepo interface {
 type UpdateUserDTOInput struct {
 	ID             uint        `json:"id" gorm:"primaryKey,autoIncrement"`
 	Login          string      `json:"login" gore:"unique"`
+	FullName       string      `json:"full_name"`
 	Password       string      `json:"password"`
 	Role           domain.Role `json:"role" gorm:"type:role;default:'user'"`
 	Email          string      `json:"email" gorm:"unique"`
@@ -125,7 +133,7 @@ func NewRepository(db *gorm.DB) Repository {
 	return Repository{
 		DB:               db,
 		AuthorRepo:       NewAuthorRepository(db.Model(&domain.Author{})),
-		BookRepo:         NewBookRepository(db.Model(&domain.Book{})),
+		BookRepo:         NewBookRepository(db),
 		FavoriteRepo:     NewFavoriteRepository(db.Model(&domain.Favorite{})),
 		GenreRepo:        NewGenreRepository(db.Model(&domain.Genre{})),
 		LogRepo:          NewLogRepository(db.Model(&domain.Log{})),

@@ -33,3 +33,11 @@ func (f FavoriteService) CreateFavorite(favoriteInput *CreateFavoriteInput) erro
 func (f FavoriteService) DeleteFavorite(id uint) error {
 	return f.repository.DeleteFavorite(id)
 }
+
+func (f FavoriteService) GetFavoriteByUserID(userID uint) ([]*domain.Favorite, error) {
+	return f.repository.GetFavoritesByUserID(userID)
+}
+
+func (f FavoriteService) DeleteFavoriteByUserIDAndBookID(userID uint, bookID uint) (*domain.Favorite, error) {
+	return f.repository.DeleteFavoriteByUserIDAndBookID(userID, bookID)
+}

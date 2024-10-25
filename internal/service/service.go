@@ -34,6 +34,7 @@ type AuthorServ interface {
 
 type CreateBookInput struct {
 	Title             string    `json:"title"`
+	Description       string    `json:"description"`
 	AuthorID          uint      `json:"author_id"`
 	Author            []uint    `json:"author,omitempty"`
 	GenreID           uint      `json:"genre_id"`
@@ -44,7 +45,6 @@ type CreateBookInput struct {
 	YearOfPublication time.Time `json:"year_of_publication"`
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
-	UniqueCode        int       `json:"unique_code"`
 }
 
 type UpdateBookInput struct {
@@ -60,7 +60,7 @@ type UpdateBookInput struct {
 	YearOfPublication time.Time `json:"year_of_publication"`
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
-	UniqueCode        int       `json:"unique_code"`
+	IsAvailable       bool      `json:"is_available"`
 }
 
 type BookServ interface {
@@ -72,6 +72,12 @@ type BookServ interface {
 	GetBookByTitle(title string) (*domain.Book, error)
 	GetBookByUniqueCode(code uint) (*domain.Book, error)
 	GetGroupedBooksByTitle() ([]*domain.Book, error)
+	CreateUniqueCode(uniqueCode *domain.UniqueCode) error
+	DeleteUniqueCode(id uint) error
+	UpdateUniqueCode(uniqueCode *domain.UniqueCode) error
+	GetBookUniqueCodes(id uint) ([]*domain.UniqueCode, error)
+	ReserveBook(bookID, userID uint) (*domain.UniqueCode, error)
+	// GetAggregatedBooks() ([]domain.AggregatedBook, error)
 }
 
 type CreateFavoriteInput struct {
@@ -84,6 +90,8 @@ type FavoriteServ interface {
 	GetFavorites() ([]*domain.Favorite, error)
 	CreateFavorite(favoriteInput *CreateFavoriteInput) error
 	DeleteFavorite(id uint) error
+	GetFavoriteByUserID(userID uint) ([]*domain.Favorite, error)
+	DeleteFavoriteByUserIDAndBookID(userID uint, bookID uint) (*domain.Favorite, error)
 }
 
 type CreateGenreInput struct {
@@ -209,6 +217,7 @@ type ReviewServ interface {
 
 type SignUpUserInput struct {
 	Login          string      `json:"login"`
+	FullName       string      `json:"full_name"`
 	Password       string      `json:"password"`
 	Email          string      `json:"email" binding:"required,email"`
 	Role           domain.Role `json:"role"`
@@ -219,6 +228,7 @@ type SignUpUserInput struct {
 type UpdateUserInput struct {
 	ID             uint        `json:"id" gorm:"primaryKey,autoIncrement"`
 	Login          string      `json:"login" gore:"unique"`
+	FullName       string      `json:"full_name"`
 	Password       string      `json:"password"`
 	Role           domain.Role `json:"role" gorm:"type:role;default:'user'"`
 	Email          string      `json:"email" gorm:"unique"`
@@ -233,6 +243,8 @@ type UserServ interface {
 	GetUserByID(id uint) (*domain.User, error)
 	GetAllUsers() ([]*domain.User, error)
 	UpdateUser(userInput *UpdateUserInput) error
+	GetUserByLogin(login string) (*domain.User, error)
+	GetUserByEmail(email string) (*domain.User, error)
 	hashPassword(password string) (string, error)
 	comparePasswords(hashedPassword, password string) bool
 }
@@ -255,7 +267,7 @@ func NewService(repo *repository.Repository) *Service {
 	return &Service{
 		repo:             repo,
 		AuthorServ:       NewAuthorService(repo.AuthorRepo),
-		BookServ:         NewBookService(repo.BookRepo),
+		BookServ:         NewBookService(repo.BookRepo, repo.ReservationRepo),
 		FavoriteServ:     NewFavoriteService(repo.FavoriteRepo),
 		GenreServ:        NewGenreService(repo.GenreRepo),
 		LogServ:          NewLogService(repo.LogRepo),

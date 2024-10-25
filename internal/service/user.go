@@ -85,6 +85,7 @@ func (u UserService) UpdateUser(userInput *UpdateUserInput) error {
 	user := &repository.UpdateUserDTOInput{
 		ID:             userInput.ID,
 		Login:          userInput.Login,
+		FullName:       userInput.FullName,
 		Password:       userInput.Password,
 		Role:           userInput.Role,
 		Email:          userInput.Email,
@@ -97,6 +98,14 @@ func (u UserService) UpdateUser(userInput *UpdateUserInput) error {
 	}
 
 	return nil
+}
+
+func (u UserService) GetUserByLogin(login string) (*domain.User, error) {
+	return u.repository.GetUserByLogin(login)
+}
+
+func (u UserService) GetUserByEmail(email string) (*domain.User, error) {
+	return u.repository.GetUserByEmail(email)
 }
 
 func (u UserService) hashPassword(password string) (string, error) {

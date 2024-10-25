@@ -9,9 +9,9 @@ import (
 type Role string
 
 const (
-	RoleUser  Role = "user"
-	RoleAdmin Role = "admin"
-	RoleGuest Role = "guest"
+	RoleUser      Role = "user"
+	RoleAdmin     Role = "admin"
+	RoleLibrarian Role = "librarian"
 )
 
 func (r *Role) Scan(value interface{}) error {
@@ -33,11 +33,12 @@ func (r Role) Value() (driver.Value, error) {
 type User struct {
 	ID             uint           `json:"id" gorm:"primaryKey,autoIncrement"`
 	Login          string         `json:"login" gore:"unique"`
+	FullName       string         `json:"full_name"`
 	Password       string         `json:"password"`
 	Role           Role           `json:"role" gorm:"type:role;default:'user'"`
 	Email          string         `json:"email" gorm:"unique"`
-	PhoneNumber    string         `json:"phoneNumber" gorm:"unique"`
-	PassportNumber int            `json:"passportNumber" gorm:"unique"`
+	PhoneNumber    string         `json:"phone_number" gorm:"unique"`
+	PassportNumber int            `json:"passport_number" gorm:"unique"`
 	Favorites      []Favorite     `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	Reservations   []Reservation  `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	Reviews        []Review       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
