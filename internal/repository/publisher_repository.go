@@ -16,7 +16,16 @@ func NewPublisherRepository(db *gorm.DB) *PublisherRepository {
 func (p PublisherRepository) GetPublisherByID(id uint) (*domain.Publisher, error) {
 	var publisher domain.Publisher
 
-	if err := p.DB.First(&publisher, id).Error; err != nil {
+	tx := p.DB.Begin()
+
+	if err := tx.First(&publisher, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -26,7 +35,16 @@ func (p PublisherRepository) GetPublisherByID(id uint) (*domain.Publisher, error
 func (p PublisherRepository) GetPublishers() ([]*domain.Publisher, error) {
 	var publishers []*domain.Publisher
 
-	if err := p.DB.Find(&publishers).Error; err != nil {
+	tx := p.DB.Begin()
+
+	if err := tx.Find(&publishers).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -34,7 +52,16 @@ func (p PublisherRepository) GetPublishers() ([]*domain.Publisher, error) {
 }
 
 func (p PublisherRepository) CreatePublisher(publisher *domain.Publisher) error {
-	if err := p.DB.Create(publisher).Error; err != nil {
+	tx := p.DB.Begin()
+
+	if err := tx.Create(publisher).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -42,7 +69,16 @@ func (p PublisherRepository) CreatePublisher(publisher *domain.Publisher) error 
 }
 
 func (p PublisherRepository) UpdatePublisher(publisher *domain.Publisher) error {
-	if err := p.DB.Save(publisher).Error; err != nil {
+	tx := p.DB.Begin()
+
+	if err := tx.Where("id = ?", publisher.ID).Save(publisher).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -50,7 +86,16 @@ func (p PublisherRepository) UpdatePublisher(publisher *domain.Publisher) error 
 }
 
 func (p PublisherRepository) DeletePublisher(id uint) error {
-	if err := p.DB.Delete(&domain.Publisher{}, id).Error; err != nil {
+	tx := p.DB.Begin()
+
+	if err := tx.Delete(&domain.Publisher{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 

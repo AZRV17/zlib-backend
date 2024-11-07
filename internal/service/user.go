@@ -51,6 +51,7 @@ func (u UserService) SignUp(userInput *SignUpUserInput) error {
 		Login:          userInput.Login,
 		Password:       hashedPass,
 		Email:          userInput.Email,
+		FullName:       userInput.FullName,
 		Role:           userInput.Role,
 		PhoneNumber:    userInput.PhoneNumber,
 		PassportNumber: userInput.PassportNumber,
@@ -106,6 +107,14 @@ func (u UserService) GetUserByLogin(login string) (*domain.User, error) {
 
 func (u UserService) GetUserByEmail(email string) (*domain.User, error) {
 	return u.repository.GetUserByEmail(email)
+}
+
+func (u UserService) UpdateUserRole(id uint, role domain.Role) error {
+	return u.repository.UpdateUserRole(id, role)
+}
+
+func (u UserService) DeleteUser(id uint) error {
+	return u.repository.DeleteUser(id)
 }
 
 func (u UserService) hashPassword(password string) (string, error) {

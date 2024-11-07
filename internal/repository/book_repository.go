@@ -37,7 +37,20 @@ func (b BookRepository) GetBookByID(id uint) (*domain.Book, error) {
 func (b BookRepository) GetBooks() ([]*domain.Book, error) {
 	var books []*domain.Book
 
-	if err := b.DB.Model(&domain.Book{}).Joins("Author").Joins("Genre").Joins("Publisher").Find(&books).Error; err != nil {
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).
+		Preload("Author").
+		Preload("Genre").
+		Preload("Publisher").
+		Preload("UniqueCodes").
+		Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 
@@ -53,7 +66,7 @@ func (b BookRepository) CreateBook(book *domain.Book) error {
 }
 
 func (b BookRepository) UpdateBook(book *domain.Book) error {
-	if err := b.DB.Model(&domain.Book{}).Save(book).Error; err != nil {
+	if err := b.DB.Model(&domain.Book{}).Where("id = ?", book.ID).Save(book).Error; err != nil {
 		return err
 	}
 
@@ -147,17 +160,9 @@ func (b BookRepository) CreateUniqueCode(uniqueCode *domain.UniqueCode) error {
 }
 
 func (b BookRepository) DeleteUniqueCode(id uint) error {
-	if err := b.DB.Model(&domain.UniqueCode{}).Delete(&domain.UniqueCode{}, id).Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b BookRepository) UpdateUniqueCode(uniqueCode *domain.UniqueCode) error {
 	tx := b.DB.Begin()
 
-	if err := tx.Model(&domain.UniqueCode{}).Save(uniqueCode).Error; err != nil {
+	if err := tx.Model(&domain.UniqueCode{}).Delete(&domain.UniqueCode{}, id).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -168,4 +173,92 @@ func (b BookRepository) UpdateUniqueCode(uniqueCode *domain.UniqueCode) error {
 	}
 
 	return nil
+}
+
+func (b BookRepository) UpdateUniqueCode(uniqueCode *domain.UniqueCode) error {
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.UniqueCode{}).Where("id = ?", uniqueCode.ID).Save(uniqueCode).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b BookRepository) GetBookByIDWithTransactions(id uint, tx *gorm.DB) (*domain.Book, error) {
+	var book domain.Book
+
+	if err := tx.Model(&domain.Book{}).Preload("Author").Preload("Genre").Preload("Publisher").First(
+		&book,
+		id,
+	).Error; err != nil {
+		return nil, err
+	}
+
+	return &book, nil
+}
+
+func (b BookRepository) GetBookUniqueCodesWithTransactions(id uint, tx *gorm.DB) ([]*domain.UniqueCode, error) {
+	var codes []*domain.UniqueCode
+
+	if err := tx.Model(&domain.UniqueCode{}).Preload("Book").Preload("Book.Author").Where(
+		"book_id = ?",
+		id,
+	).Find(&codes).Error; err != nil {
+		return nil, err
+	}
+
+	return codes, nil
+}
+
+func (b BookRepository) UpdateUniqueCodeWithTransactions(uniqueCode *domain.UniqueCode, tx *gorm.DB) error {
+	if err := tx.Model(&domain.UniqueCode{}).Where("id = ?", uniqueCode.ID).Save(uniqueCode).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b BookRepository) GetUniqueCodes() ([]*domain.UniqueCode, error) {
+	var codes []*domain.UniqueCode
+
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.UniqueCode{}).Preload("Book").Find(&codes).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return codes, nil
+}
+
+func (b BookRepository) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
+	var code domain.UniqueCode
+
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.UniqueCode{}).Preload("Book").First(&code, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return &code, nil
 }

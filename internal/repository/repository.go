@@ -30,7 +30,11 @@ type BookRepo interface {
 	CreateUniqueCode(uniqueCode *domain.UniqueCode) error
 	DeleteUniqueCode(id uint) error
 	UpdateUniqueCode(uniqueCode *domain.UniqueCode) error
-	//GetAggregatedBooks() ([]domain.AggregatedBook, error)
+	GetBookByIDWithTransactions(id uint, tx *gorm.DB) (*domain.Book, error)
+	GetBookUniqueCodesWithTransactions(id uint, tx *gorm.DB) ([]*domain.UniqueCode, error)
+	UpdateUniqueCodeWithTransactions(uniqueCode *domain.UniqueCode, tx *gorm.DB) error
+	GetUniqueCodes() ([]*domain.UniqueCode, error)
+	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 }
 
 type FavoriteRepo interface {
@@ -81,6 +85,8 @@ type ReservationRepo interface {
 	CreateReservation(reservation *domain.Reservation) error
 	UpdateReservation(reservation *domain.Reservation) error
 	DeleteReservation(id uint) error
+	CreateReservationWithTransactions(reservation *domain.Reservation, tx *gorm.DB) error
+	GetUserReservations(id uint) ([]*domain.Reservation, error)
 }
 
 type ReviewRepo interface {
@@ -113,6 +119,7 @@ type UserRepo interface {
 	UpdateUser(user *UpdateUserDTOInput) error
 	GetUserByLogin(login string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
+	UpdateUserRole(id uint, role domain.Role) error
 }
 
 type Repository struct {

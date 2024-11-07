@@ -38,7 +38,7 @@ func Run() {
 
 	repo := repository.NewRepository(psql.DB)
 
-	service := serv.NewService(&repo)
+	service := serv.NewService(&repo, psql.DB)
 
 	r := gin.Default()
 

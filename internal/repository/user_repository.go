@@ -34,7 +34,16 @@ func (u UserRepository) GetUserByID(id uint) (*domain.User, error) {
 func (u UserRepository) GetUsers() ([]*domain.User, error) {
 	var users []*domain.User
 
-	if err := u.DB.Find(&users).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Find(&users).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -94,7 +103,16 @@ func (u UserRepository) SignUp(user *domain.User) error {
 }
 
 func (u UserRepository) DeleteUser(id uint) error {
-	if err := u.DB.Delete(&domain.User{}, id).Error; err != nil {
+	tx := u.DB.Begin()
+
+	if err := tx.Delete(&domain.User{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -151,4 +169,20 @@ func (u UserRepository) GetUserByEmail(email string) (*domain.User, error) {
 	}
 
 	return &user, nil
+}
+
+func (u UserRepository) UpdateUserRole(id uint, role domain.Role) error {
+	tx := u.DB.Begin()
+
+	if err := tx.Where("id = ?", id).Update("role", role).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -21,6 +21,12 @@ func NewHandler(service service.Service, cfg *config.Config) *Handler {
 func (h *Handler) Init(r *gin.Engine) {
 	h.initUserRoutes(r)
 	h.initBookRoutes(r)
+	h.initPublisherRoutes(r)
+	h.initAuthorRoutes(r)
 	h.initGenreRoutes(r)
 	h.initFavoriteRoutes(r)
+	h.initReservationRoutes(r)
+	h.initReviewRoutes(r)
+	h.initUniqueCodeRoutes(r)
+	h.initBackupRoutes(r)
 }

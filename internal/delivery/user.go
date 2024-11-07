@@ -22,6 +22,9 @@ func (h *Handler) initUserRoutes(r *gin.Engine) {
 		users.GET("/cookie", h.getUserByCookie)
 		users.PATCH("/cookie", h.updateUserByCookie)
 		users.POST("/logout", h.logout)
+		users.DELETE("/:id", h.deleteUser)
+		users.DELETE("/cookie", h.deleteUserByCookie)
+		users.Use(h.AuthMiddleware, h.AdminMiddleware).PATCH("/change-role", h.updateUserRole)
 	}
 }
 
@@ -291,4 +294,71 @@ func (h *Handler) updateUserByCookie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
+}
+
+type updateUserRoleInput struct {
+	ID   uint   `json:"id"`
+	Role string `json:"role"`
+}
+
+func (h *Handler) updateUserRole(c *gin.Context) {
+	var input updateUserRoleInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.service.UserServ.UpdateUserRole(input.ID, domain.Role(input.Role))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user role updated"})
+}
+
+func (h *Handler) deleteUser(c *gin.Context) {
+	userID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.UserServ.DeleteUser(uint(userID)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+}
+
+func (h *Handler) deleteUserByCookie(c *gin.Context) {
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	if cookie.Value == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userID, err := strconv.Atoi(cookie.Value)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if err := h.service.UserServ.DeleteUser(uint(userID)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
 }

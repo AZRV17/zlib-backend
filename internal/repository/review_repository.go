@@ -16,7 +16,16 @@ func NewReviewRepository(db *gorm.DB) *ReviewRepository {
 func (r ReviewRepository) GetReviewByID(id uint) (*domain.Review, error) {
 	var review domain.Review
 
-	if err := r.DB.First(&review, id).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.First(&review, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -26,7 +35,16 @@ func (r ReviewRepository) GetReviewByID(id uint) (*domain.Review, error) {
 func (r ReviewRepository) GetReviews() ([]*domain.Review, error) {
 	var reviews []*domain.Review
 
-	if err := r.DB.Find(&reviews).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Find(&reviews).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -34,7 +52,16 @@ func (r ReviewRepository) GetReviews() ([]*domain.Review, error) {
 }
 
 func (r ReviewRepository) CreateReview(review *domain.Review) error {
-	if err := r.DB.Create(review).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Create(review).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -42,7 +69,16 @@ func (r ReviewRepository) CreateReview(review *domain.Review) error {
 }
 
 func (r ReviewRepository) UpdateReview(review *domain.Review) error {
-	if err := r.DB.Save(review).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Where("id = ?", review.ID).Save(review).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -50,7 +86,16 @@ func (r ReviewRepository) UpdateReview(review *domain.Review) error {
 }
 
 func (r ReviewRepository) DeleteReview(id uint) error {
-	if err := r.DB.Delete(&domain.Review{}, id).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Delete(&domain.Review{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -60,7 +105,16 @@ func (r ReviewRepository) DeleteReview(id uint) error {
 func (r ReviewRepository) GetReviewsByBookID(id uint) ([]*domain.Review, error) {
 	var reviews []*domain.Review
 
-	if err := r.DB.Where("book_id = ?", id).Find(&reviews).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Preload("User").Where("book_id = ?", id).Find(&reviews).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 

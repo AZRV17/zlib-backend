@@ -16,7 +16,16 @@ func NewAuthorRepository(db *gorm.DB) *AuthorRepository {
 func (a AuthorRepository) GetAuthorByID(id uint) (*domain.Author, error) {
 	var author domain.Author
 
-	if err := a.DB.First(&author, id).Error; err != nil {
+	tx := a.DB.Begin()
+
+	if err := tx.First(&author, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -26,8 +35,16 @@ func (a AuthorRepository) GetAuthorByID(id uint) (*domain.Author, error) {
 func (a AuthorRepository) GetAuthors() ([]*domain.Author, error) {
 	var authors []*domain.Author
 
-	if err := a.DB.Preload("Books").Find(&authors).Error; err != nil {
-		a.DB.Rollback()
+	tx := a.DB.Begin()
+
+	if err := tx.Preload("Books").Find(&authors).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -35,8 +52,16 @@ func (a AuthorRepository) GetAuthors() ([]*domain.Author, error) {
 }
 
 func (a AuthorRepository) CreateAuthor(author *domain.Author) error {
-	if err := a.DB.Create(author).Error; err != nil {
-		a.DB.Rollback()
+	tx := a.DB.Begin()
+
+	if err := tx.Create(author).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -44,8 +69,16 @@ func (a AuthorRepository) CreateAuthor(author *domain.Author) error {
 }
 
 func (a AuthorRepository) UpdateAuthor(author *domain.Author) error {
-	if err := a.DB.Save(author).Error; err != nil {
-		a.DB.Rollback()
+	tx := a.DB.Begin()
+
+	if err := tx.Model(&domain.Author{}).Where("id = ?", author.ID).Save(author).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -53,8 +86,16 @@ func (a AuthorRepository) UpdateAuthor(author *domain.Author) error {
 }
 
 func (a AuthorRepository) DeleteAuthor(id uint) error {
-	if err := a.DB.Delete(&domain.Author{}, id).Error; err != nil {
-		a.DB.Rollback()
+	tx := a.DB.Begin()
+
+	if err := tx.Delete(&domain.Author{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 

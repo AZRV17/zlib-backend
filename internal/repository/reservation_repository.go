@@ -16,7 +16,16 @@ func NewReservationRepository(db *gorm.DB) *ReservationRepository {
 func (r ReservationRepository) GetReservationByID(id uint) (*domain.Reservation, error) {
 	var reservation domain.Reservation
 
-	if err := r.DB.First(&reservation, id).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.First(&reservation, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -26,7 +35,16 @@ func (r ReservationRepository) GetReservationByID(id uint) (*domain.Reservation,
 func (r ReservationRepository) GetReservations() ([]*domain.Reservation, error) {
 	var reservations []*domain.Reservation
 
-	if err := r.DB.Find(&reservations).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Preload("Book").Preload("UniqueCode").Preload("User").Find(&reservations).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -34,7 +52,16 @@ func (r ReservationRepository) GetReservations() ([]*domain.Reservation, error) 
 }
 
 func (r ReservationRepository) CreateReservation(reservation *domain.Reservation) error {
-	if err := r.DB.Create(reservation).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Create(reservation).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -42,7 +69,16 @@ func (r ReservationRepository) CreateReservation(reservation *domain.Reservation
 }
 
 func (r ReservationRepository) UpdateReservation(reservation *domain.Reservation) error {
-	if err := r.DB.Save(reservation).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Where("id = ?", reservation.ID).Save(reservation).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -50,9 +86,40 @@ func (r ReservationRepository) UpdateReservation(reservation *domain.Reservation
 }
 
 func (r ReservationRepository) DeleteReservation(id uint) error {
-	if err := r.DB.Delete(&domain.Reservation{}, id).Error; err != nil {
+	tx := r.DB.Begin()
+
+	if err := tx.Delete(&domain.Reservation{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
 	return nil
+}
+
+func (r ReservationRepository) CreateReservationWithTransactions(reservation *domain.Reservation, tx *gorm.DB) error {
+	if err := tx.Model(&domain.Reservation{}).Create(reservation).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r ReservationRepository) GetUserReservations(id uint) ([]*domain.Reservation, error) {
+	var reservations []*domain.Reservation
+
+	if err := r.DB.Where(
+		"user_id = ?",
+		id,
+	).Preload("Book").Preload("Book.Author").Preload("Book.Genre").Preload("Book.Publisher").
+		Find(&reservations).Error; err != nil {
+		return nil, err
+	}
+
+	return reservations, nil
 }

@@ -19,7 +19,7 @@ type Book struct {
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
 	//UniqueCode       int           `json:"unique_codes"`
-	IsAvailable  bool          `json:"is_available" gorm:"default:true"`
+	UniqueCodes  []UniqueCode  `json:"unique_codes,omitempty" gorm:"foreignKey:BookID;references:ID"`
 	Favorites    []Favorite    `json:"favorites,omitempty"`
 	Reservations []Reservation `json:"reservations,omitempty"`
 	Reviews      []Review      `json:"reviews,omitempty"`
@@ -43,9 +43,9 @@ type AggregatedBook struct {
 }
 
 type UniqueCode struct {
-	ID          uint `json:"id"`
+	ID          uint `gorm:"primary_key,autoIncrement" json:"id"`
 	Code        int  `json:"code"`
 	BookID      uint `json:"book_id"`
-	Book        Book `json:"book,omitempty" gorm:"book"`
+	Book        Book `json:"book" gorm:"foreignKey:BookID;references:ID"`
 	IsAvailable bool `json:"is_available"`
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
+	"log"
 )
 
 type FavoriteRepository struct {
@@ -34,7 +35,16 @@ func (f FavoriteRepository) GetFavorites() ([]*domain.Favorite, error) {
 }
 
 func (f FavoriteRepository) CreateFavorite(favorite *domain.Favorite) error {
-	if err := f.DB.Create(favorite).Error; err != nil {
+	tx := f.DB.Begin()
+
+	if err := tx.Create(favorite).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 
@@ -54,13 +64,16 @@ func (f FavoriteRepository) GetFavoritesByUserID(id uint) ([]*domain.Favorite, e
 
 	tx := f.DB.Begin()
 
-	if err := tx.Preload("Book").Joins("Book.Author").Joins("Book.Genre").Joins("Book.Publisher").Where(
+	if err := tx.Preload("Book").Preload("Book.Author").Preload("Book.Genre").Preload("Book.Publisher").Where(
 		"user_id = ?",
 		id,
 	).Find(&favorites).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}
+
+	log.Printf("Favorites: %v\n", favorites)
+	log.Println(id)
 
 	err := tx.Commit().Error
 	if err != nil {
@@ -73,7 +86,15 @@ func (f FavoriteRepository) GetFavoritesByUserID(id uint) ([]*domain.Favorite, e
 func (f FavoriteRepository) DeleteFavoriteByUserIDAndBookID(userID uint, bookID uint) (*domain.Favorite, error) {
 	var favorite domain.Favorite
 
-	if err := f.DB.Where("user_id = ? AND book_id = ?", userID, bookID).Delete(&favorite).Error; err != nil {
+	tx := f.DB.Begin()
+
+	if err := tx.Where("user_id = ? AND book_id = ?", userID, bookID).Delete(&favorite).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return nil, err
 	}
 

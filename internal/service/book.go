@@ -4,16 +4,22 @@ import (
 	"errors"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"gorm.io/gorm"
 	"time"
 )
 
 type BookService struct {
 	bookRepo        repository.BookRepo
 	reservationRepo repository.ReservationRepo
+	db              *gorm.DB
 }
 
-func NewBookService(bookRepo repository.BookRepo, reservationRepo repository.ReservationRepo) *BookService {
-	return &BookService{bookRepo: bookRepo, reservationRepo: reservationRepo}
+func NewBookService(
+	bookRepo repository.BookRepo,
+	reservationRepo repository.ReservationRepo,
+	db *gorm.DB,
+) *BookService {
+	return &BookService{bookRepo: bookRepo, reservationRepo: reservationRepo, db: db}
 }
 
 func (b BookService) GetBookByID(id uint) (*domain.Book, error) {
@@ -86,18 +92,26 @@ func (b BookService) UpdateUniqueCode(uniqueCode *domain.UniqueCode) error {
 	return b.bookRepo.UpdateUniqueCode(uniqueCode)
 }
 
+func (b BookService) GetUniqueCodes() ([]*domain.UniqueCode, error) {
+	return b.bookRepo.GetUniqueCodes()
+}
+
 func (b BookService) GetBookUniqueCodes(id uint) ([]*domain.UniqueCode, error) {
 	return b.bookRepo.GetBookUniqueCodes(id)
 }
 
 func (b BookService) ReserveBook(bookID, userID uint) (*domain.UniqueCode, error) {
-	book, err := b.bookRepo.GetBookByID(bookID)
+	tx := b.db.Begin()
+
+	book, err := b.bookRepo.GetBookByIDWithTransactions(bookID, tx)
 	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
-	codes, err := b.bookRepo.GetBookUniqueCodes(book.ID)
+	codes, err := b.bookRepo.GetBookUniqueCodesWithTransactions(book.ID, tx)
 	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -110,10 +124,11 @@ func (b BookService) ReserveBook(bookID, userID uint) (*domain.UniqueCode, error
 	}
 
 	if code == nil {
+		tx.Rollback()
 		return nil, errors.New("no available books")
 	}
 
-	err = b.reservationRepo.CreateReservation(
+	err = b.reservationRepo.CreateReservationWithTransactions(
 		&domain.Reservation{
 			BookID:       book.ID,
 			UserID:       userID,
@@ -121,22 +136,29 @@ func (b BookService) ReserveBook(bookID, userID uint) (*domain.UniqueCode, error
 			Status:       "reserved",
 			DateOfIssue:  time.Now(),
 			DateOfReturn: time.Now().Add(7 * 24 * time.Hour),
-		},
+		}, tx,
 	)
 	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
 	code.IsAvailable = false
 
-	err = b.bookRepo.UpdateUniqueCode(code)
+	err = b.bookRepo.UpdateUniqueCodeWithTransactions(code, tx)
 	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
-	return nil, nil
+	err = tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	return code, nil
 }
 
-//func (b BookService) GetAggregatedBooks() ([]domain.AggregatedBook, error) {
-//	return b.repository.GetAggregatedBooks()
-//}
+func (b *BookService) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
+	return b.bookRepo.GetUniqueCodeByID(id)
+}

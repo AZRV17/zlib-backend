@@ -3,6 +3,7 @@ package service
 import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -77,6 +78,8 @@ type BookServ interface {
 	UpdateUniqueCode(uniqueCode *domain.UniqueCode) error
 	GetBookUniqueCodes(id uint) ([]*domain.UniqueCode, error)
 	ReserveBook(bookID, userID uint) (*domain.UniqueCode, error)
+	GetUniqueCodes() ([]*domain.UniqueCode, error)
+	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	// GetAggregatedBooks() ([]domain.AggregatedBook, error)
 }
 
@@ -171,6 +174,7 @@ type CreateReservationInput struct {
 	BookID       uint      `json:"book_id"`
 	Status       string    `json:"status,omitempty"`
 	DateOfReturn time.Time `json:"date_of_return"`
+	DateOfIssue  time.Time `json:"date_of_issue"`
 }
 
 type UpdateReservationInput struct {
@@ -179,6 +183,7 @@ type UpdateReservationInput struct {
 	BookID       uint      `json:"book_id"`
 	Status       string    `json:"status,omitempty"`
 	DateOfReturn time.Time `json:"date_of_return"`
+	DateOfIssue  time.Time `json:"date_of_issue"`
 }
 
 type ReservationServ interface {
@@ -187,12 +192,12 @@ type ReservationServ interface {
 	CreateReservation(reservationInput *CreateReservationInput) error
 	UpdateReservation(reservationInput *UpdateReservationInput) error
 	DeleteReservation(id uint) error
+	GetReservationsByUserID(id uint) ([]*domain.Reservation, error)
 }
 
 type CreateReviewInput struct {
 	UserID  uint    `json:"user_id"`
 	BookID  uint    `json:"book_id"`
-	Review  string  `json:"review"`
 	Rating  float32 `json:"rating"`
 	Message string  `json:"message"`
 }
@@ -245,6 +250,8 @@ type UserServ interface {
 	UpdateUser(userInput *UpdateUserInput) error
 	GetUserByLogin(login string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
+	UpdateUserRole(id uint, role domain.Role) error
+	DeleteUser(id uint) error
 	hashPassword(password string) (string, error)
 	comparePasswords(hashedPassword, password string) bool
 }
@@ -263,11 +270,11 @@ type Service struct {
 	UserServ
 }
 
-func NewService(repo *repository.Repository) *Service {
+func NewService(repo *repository.Repository, db *gorm.DB) *Service {
 	return &Service{
 		repo:             repo,
 		AuthorServ:       NewAuthorService(repo.AuthorRepo),
-		BookServ:         NewBookService(repo.BookRepo, repo.ReservationRepo),
+		BookServ:         NewBookService(repo.BookRepo, repo.ReservationRepo, db),
 		FavoriteServ:     NewFavoriteService(repo.FavoriteRepo),
 		GenreServ:        NewGenreService(repo.GenreRepo),
 		LogServ:          NewLogService(repo.LogRepo),

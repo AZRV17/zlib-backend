@@ -49,3 +49,7 @@ func (r ReservationService) UpdateReservation(reservationInput *UpdateReservatio
 func (r ReservationService) DeleteReservation(id uint) error {
 	return r.repository.DeleteReservation(id)
 }
+
+func (r ReservationService) GetReservationsByUserID(id uint) ([]*domain.Reservation, error) {
+	return r.repository.GetUserReservations(id)
+}

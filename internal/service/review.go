@@ -6,7 +6,8 @@ import (
 )
 
 type ReviewService struct {
-	repository repository.ReviewRepo
+	repository     repository.ReviewRepo
+	bookRepository repository.BookRepo
 }
 
 func NewReviewService(repo repository.ReviewRepo) *ReviewService {
@@ -27,6 +28,11 @@ func (r ReviewService) CreateReview(reviewInput *CreateReviewInput) error {
 		BookID:  reviewInput.BookID,
 		Rating:  reviewInput.Rating,
 		Message: reviewInput.Message,
+	}
+
+	err := r.updateBookRating(review.BookID, review.Rating)
+	if err != nil {
+		return err
 	}
 
 	return r.repository.CreateReview(review)
@@ -52,4 +58,26 @@ func (r ReviewService) DeleteReview(id uint) error {
 
 func (r ReviewService) GetReviewsByBookID(id uint) ([]*domain.Review, error) {
 	return r.repository.GetReviewsByBookID(id)
+}
+
+func (r ReviewService) updateBookRating(bookID uint, rating float32) error {
+	book, err := r.bookRepository.GetBookByID(bookID)
+	if err != nil {
+		return err
+	}
+
+	bookReviews, err := r.repository.GetReviewsByBookID(bookID)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range bookReviews {
+		rating += r.Rating
+	}
+
+	rating /= float32(len(bookReviews) + 1)
+
+	book.Rating = rating
+
+	return r.bookRepository.UpdateBook(book)
 }
