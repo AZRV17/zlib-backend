@@ -58,6 +58,18 @@ func (h *Handler) createGenre(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание жанра")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "genre created"})
 }
 
@@ -75,6 +87,18 @@ func (h *Handler) updateGenre(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение жанра")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "genre updated"})
 }
 
@@ -86,6 +110,18 @@ func (h *Handler) deleteGenre(c *gin.Context) {
 	}
 
 	err = h.service.GenreServ.DeleteGenre(uint(genreID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление жанра")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

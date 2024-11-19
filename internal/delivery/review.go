@@ -64,6 +64,18 @@ func (h *Handler) createReview(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Добавление отзыва")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "success"})
 }
 

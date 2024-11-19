@@ -3,6 +3,9 @@ package service
 import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"net/http"
+	"strconv"
+	"time"
 )
 
 type LogService struct {
@@ -50,4 +53,24 @@ func (l LogService) DeleteLog(id uint) error {
 
 func (l LogService) GetLogsByUserID(id uint) ([]*domain.Log, error) {
 	return l.repository.GetLogsByUserID(id)
+}
+
+func (l LogService) CreateLogWithCookie(cookie *http.Cookie, action string) error {
+	if cookie.Value == "" {
+		return nil
+	}
+
+	userID, err := strconv.Atoi(cookie.Value)
+	if err != nil {
+		return err
+	}
+
+	log := &domain.Log{
+		UserID:  uint(userID), //nolint:gosec
+		Action:  action,
+		Date:    time.Now(),
+		Details: action,
+	}
+
+	return l.repository.CreateLog(log)
 }

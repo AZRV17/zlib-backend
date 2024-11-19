@@ -57,6 +57,18 @@ func (h *Handler) deletePublisher(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление издателя")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "publisher deleted"})
 }
 
@@ -74,6 +86,18 @@ func (h *Handler) updatePublisher(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение издателя")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "publisher updated"})
 }
 
@@ -86,6 +110,18 @@ func (h *Handler) createPublisher(c *gin.Context) {
 	}
 
 	err := h.service.PublisherServ.CreatePublisher(&input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание издателя")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

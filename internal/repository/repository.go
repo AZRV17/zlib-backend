@@ -15,6 +15,7 @@ type AuthorRepo interface {
 	CreateAuthorBook(authorBook *domain.AuthorBook) error
 	DeleteAuthorBook(id uint) error
 	UpdateAuthorBook(authorBook *domain.AuthorBook) error
+	ExportAuthorsToCSV() ([]byte, error)
 }
 
 type BookRepo interface {
@@ -35,6 +36,8 @@ type BookRepo interface {
 	UpdateUniqueCodeWithTransactions(uniqueCode *domain.UniqueCode, tx *gorm.DB) error
 	GetUniqueCodes() ([]*domain.UniqueCode, error)
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
+	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
+	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
 }
 
 type FavoriteRepo interface {

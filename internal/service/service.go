@@ -4,6 +4,7 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"gorm.io/gorm"
+	"net/http"
 	"time"
 )
 
@@ -31,6 +32,7 @@ type AuthorServ interface {
 	GetAuthorBooks(id uint) ([]*domain.Book, error)
 	CreateAuthorBook(authorBookInput *domain.AuthorBook) error
 	DeleteAuthorBook(id uint) error
+	ExportAuthorsToCSV() ([]byte, error)
 }
 
 type CreateBookInput struct {
@@ -80,7 +82,8 @@ type BookServ interface {
 	ReserveBook(bookID, userID uint) (*domain.UniqueCode, error)
 	GetUniqueCodes() ([]*domain.UniqueCode, error)
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
-	// GetAggregatedBooks() ([]domain.AggregatedBook, error)
+	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
+	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
 }
 
 type CreateFavoriteInput struct {
@@ -138,6 +141,7 @@ type LogServ interface {
 	UpdateLog(logInput *UpdateLogInput) error
 	DeleteLog(id uint) error
 	GetLogsByUserID(id uint) ([]*domain.Log, error)
+	CreateLogWithCookie(cookie *http.Cookie, action string) error
 }
 
 type CreateNotificationInput struct {

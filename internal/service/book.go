@@ -5,6 +5,7 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"gorm.io/gorm"
+	"strings"
 	"time"
 )
 
@@ -23,11 +24,34 @@ func NewBookService(
 }
 
 func (b BookService) GetBookByID(id uint) (*domain.Book, error) {
-	return b.bookRepo.GetBookByID(id)
+	book, err := b.bookRepo.GetBookByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+		return book, nil
+	}
+
+	book.Picture = "http://localhost:8080/" + book.Picture
+	return book, err
 }
 
 func (b BookService) GetBooks() ([]*domain.Book, error) {
-	return b.bookRepo.GetBooks()
+	books, err := b.bookRepo.GetBooks()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, book := range books {
+		if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+			continue
+		}
+
+		book.Picture = "http://localhost:8080/" + book.Picture
+	}
+
+	return books, nil
 }
 
 func (b BookService) CreateBook(bookInput *CreateBookInput) error {
@@ -161,4 +185,25 @@ func (b BookService) ReserveBook(bookID, userID uint) (*domain.UniqueCode, error
 
 func (b *BookService) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
 	return b.bookRepo.GetUniqueCodeByID(id)
+}
+
+func (b *BookService) GetBooksWithPagination(offset, limit int) ([]*domain.Book, error) {
+	books, err := b.bookRepo.GetBooksWithPagination(offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, book := range books {
+		if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+			continue
+		}
+
+		book.Picture = "http://localhost:8080/" + book.Picture
+	}
+
+	return books, nil
+}
+
+func (b *BookService) FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error) {
+	return b.bookRepo.FindBookByTitle(limit, offset, title)
 }

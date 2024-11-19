@@ -62,7 +62,7 @@ func (h *Handler) LibrarianMiddleware(c *gin.Context) {
 		return
 	}
 
-	if user.(*domain.User).Role != domain.RoleLibrarian {
+	if user.(*domain.User).Role != "librarian" {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}

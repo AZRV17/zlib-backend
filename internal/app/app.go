@@ -14,6 +14,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -55,6 +56,17 @@ func Run() {
 			},
 		),
 	)
+
+	if _, err := os.Stat("uploads/books"); errors.Is(err, os.ErrNotExist) {
+		// Создаем папку если её нет
+		if err := os.MkdirAll("uploads/books", 0755); err != nil {
+			log.Fatalf("Failed to create uploads directory: %v", err)
+		}
+	}
+
+	// Настраиваем раздачу статических файлов
+	// Первый параметр - это URL путь, второй - путь к папке на сервере
+	r.Static("/uploads", "./uploads")
 
 	handler := delivery.NewHandler(*service, cfg)
 

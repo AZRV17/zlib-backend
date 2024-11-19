@@ -83,6 +83,12 @@ func (h *Handler) deleteFavoriteByUserIDByCookie(c *gin.Context) {
 		return
 	}
 
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление из избранного")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, favorite)
 }
 
@@ -125,6 +131,12 @@ func (h *Handler) createFavoriteByUserIDByCookie(c *gin.Context) {
 			UserID: uint(userID), //nolint:gosec
 		},
 	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Добавление книги в избранное")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

@@ -314,6 +314,18 @@ func (h *Handler) updateUserRole(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение роли пользователя")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "user role updated"})
 }
 
@@ -325,6 +337,18 @@ func (h *Handler) deleteUser(c *gin.Context) {
 	}
 
 	if err := h.service.UserServ.DeleteUser(uint(userID)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление пользователя")
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

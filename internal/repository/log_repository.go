@@ -26,7 +26,16 @@ func (l LogRepository) GetLogByID(id uint) (*domain.Log, error) {
 func (l LogRepository) GetLogs() ([]*domain.Log, error) {
 	var logs []*domain.Log
 
-	if err := l.DB.Find(&logs).Error; err != nil {
+	tx := l.DB.Begin()
+
+	if err := tx.Preload("User").Find(&logs).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 
@@ -34,7 +43,16 @@ func (l LogRepository) GetLogs() ([]*domain.Log, error) {
 }
 
 func (l LogRepository) CreateLog(log *domain.Log) error {
-	if err := l.DB.Create(log).Error; err != nil {
+	tx := l.DB.Begin()
+
+	if err := tx.Create(log).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
 

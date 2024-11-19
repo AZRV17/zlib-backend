@@ -80,3 +80,7 @@ func (a AuthorService) DeleteAuthorBook(id uint) error {
 
 	return nil
 }
+
+func (a AuthorService) ExportAuthorsToCSV() ([]byte, error) {
+	return a.repository.ExportAuthorsToCSV()
+}

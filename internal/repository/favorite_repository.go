@@ -1,9 +1,13 @@
 package repository
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
 	"log"
+	"strconv"
 )
 
 type FavoriteRepository struct {
@@ -99,4 +103,38 @@ func (f FavoriteRepository) DeleteFavoriteByUserIDAndBookID(userID uint, bookID 
 	}
 
 	return &favorite, nil
+}
+
+func (f FavoriteRepository) ExportFavoritesToCSV() ([]byte, error) {
+	favorites, err := f.GetFavorites()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+
+	headers := []string{"ID", "Пользователь", "Книга"}
+	if err := writer.Write(headers); err != nil {
+		return nil, err
+	}
+
+	for _, favorite := range favorites {
+		row := []string{
+			strconv.FormatUint(uint64(favorite.ID), 10),
+			strconv.FormatUint(uint64(favorite.UserID), 10),
+			strconv.FormatUint(uint64(favorite.BookID), 10),
+		}
+		if err := writer.Write(row); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

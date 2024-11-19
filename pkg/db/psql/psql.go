@@ -6,6 +6,7 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -61,23 +62,6 @@ func Close() {
 	log.Println("db closed")
 }
 
-// BackupDatabase создает полный бэкап базы данных в файл
-func BackupDatabase(dsn string) error {
-	backupFile := fmt.Sprintf("./backups/backup.sql")
-
-	cmd := exec.Command("pg_dump", dsn, "-f", backupFile)
-	cmd.Env = os.Environ()
-
-	if err := cmd.Run(); err != nil {
-		log.Println(cmd)
-		log.Printf("Ошибка создания бэкапа: %v", err)
-		return err
-	}
-
-	log.Printf("Бэкап базы данных создан: %s", backupFile)
-	return nil
-}
-
 // DropAndCreateDatabase удаляет существующую базу данных и создает ее заново
 func DropAndCreateDatabase(host, port, user, password, dbName string) error {
 	// Устанавливаем переменные среды для подключения
@@ -112,25 +96,49 @@ func DropAndCreateDatabase(host, port, user, password, dbName string) error {
 	return nil
 }
 
-// RestoreDatabase восстанавливает базу данных из бэкап файла
-func RestoreDatabase(host, port, user, password, dbName string) error {
+// BackupDatabase создает бэкап базы данных и возвращает его как []byte
+func BackupDatabase(dsn string) ([]byte, error) {
+	// Создаем буфер для хранения вывода pg_dump
+	var outBuffer bytes.Buffer
+
+	// Запускаем pg_dump и направляем вывод в буфер
+	cmd := exec.Command("pg_dump", dsn)
+	cmd.Stdout = &outBuffer
+	cmd.Env = os.Environ()
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("Ошибка создания бэкапа: %v", err)
+		return nil, err
+	}
+
+	return outBuffer.Bytes(), nil
+}
+
+// RestoreDatabase восстанавливает базу данных из предоставленного ридера
+func RestoreDatabase(host, port, user, password, dbName string, backupData io.Reader) error {
 	// Удаляем и создаем базу данных заново
-	if err := DropAndCreateDatabase(host, port, user, password, "testDB"); err != nil {
+	if err := DropAndCreateDatabase(host, port, user, password, dbName); err != nil {
 		return err
 	}
 
 	// Устанавливаем базу данных для восстановления
-	os.Setenv("PGDATABASE", "testDB")
+	os.Setenv("PGDATABASE", dbName)
 
-	// Восстанавливаем данные из бэкапа
-	restoreCmd := exec.Command("psql", "-f", "./backups/backup.sql")
-	restoreCmd.Env = os.Environ()
+	// Создаем команду psql для восстановления
+	cmd := exec.Command("psql")
+	cmd.Env = os.Environ()
 
-	if err := restoreCmd.Run(); err != nil {
-		log.Printf("Ошибка восстановления базы данных: %v", err)
-		return err
+	// Присоединяем входные данные к stdin команды
+	cmd.Stdin = backupData
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("Ошибка восстановления базы данных: %v, %s", err, stderr.String())
+		return fmt.Errorf("error restoring database: %v, %s", err, stderr.String())
 	}
 
-	log.Printf("База данных %s успешно восстановлена из бэкапа: %s", "testDB", "./backups/backup.sql")
+	log.Printf("База данных %s успешно восстановлена", dbName)
 	return nil
 }

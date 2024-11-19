@@ -1,8 +1,10 @@
 package delivery
 
 import (
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,6 +18,7 @@ func (h *Handler) initAuthorRoutes(r *gin.Engine) {
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/", h.createAuthor)
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id", h.updateAuthor)
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).DELETE("/:id", h.deleteAuthor)
+		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/export", h.exportAuthorsToCSV)
 	}
 }
 
@@ -72,6 +75,18 @@ func (h *Handler) createAuthor(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание автора")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "author created"})
 }
 
@@ -104,6 +119,18 @@ func (h *Handler) updateAuthor(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Обновление автора")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "author updated"})
 }
 
@@ -120,5 +147,50 @@ func (h *Handler) deleteAuthor(c *gin.Context) {
 		return
 	}
 
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление автора")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "author deleted"})
+}
+
+func (h *Handler) exportAuthorsToCSV(c *gin.Context) {
+	authorData, err := h.service.AuthorServ.ExportAuthorsToCSV()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filename := "authors.csv"
+	// Устанавливаем заголовки для скачивания файла
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Expires", "0")
+	c.Header("Cache-Control", "must-revalidate")
+	c.Header("Pragma", "public")
+	c.Header("Content-Length", fmt.Sprint(len(authorData)))
+
+	c.Data(http.StatusOK, "text/csv", authorData)
+
+	// Логируем действие
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		log.Printf("Error getting cookie for logging: %v", err)
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт авторов в CSV")
+	if err != nil {
+		log.Printf("Error creating log: %v", err)
+	}
 }

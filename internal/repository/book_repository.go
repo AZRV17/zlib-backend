@@ -1,8 +1,12 @@
 package repository
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
+	"strconv"
 )
 
 type BookRepository struct {
@@ -261,4 +265,83 @@ func (b BookRepository) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
 	}
 
 	return &code, nil
+}
+
+func (b BookRepository) GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return nil, err
+	}
+
+	return books, nil
+}
+
+func (b BookRepository) FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).Where(
+		"lower(title) like lower(?)",
+		"%"+title+"%",
+	).Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return books, nil
+}
+
+func (b BookRepository) ExportBooksToCSV() ([]byte, error) {
+	books, err := b.GetBooks()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+
+	headers := []string{"ID", "Название", "Автор", "Жанр", "Издательство", "Дата выхода"}
+
+	if err := writer.Write(headers); err != nil {
+		return nil, err
+	}
+
+	for _, book := range books {
+		row := []string{
+			strconv.FormatUint(uint64(book.ID), 10),
+			book.Title,
+			book.Author.Name + " " + book.Author.Lastname,
+			book.Genre.Name,
+			book.Publisher.Name,
+			book.YearOfPublication.Format("2006-01-02"),
+		}
+
+		if err := writer.Write(row); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

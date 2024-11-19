@@ -29,4 +29,5 @@ func (h *Handler) Init(r *gin.Engine) {
 	h.initReviewRoutes(r)
 	h.initUniqueCodeRoutes(r)
 	h.initBackupRoutes(r)
+	h.initLogRoutes(r)
 }
