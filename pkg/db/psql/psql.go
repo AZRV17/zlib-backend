@@ -106,17 +106,18 @@ func DropAndCreateDatabase(host, port, user, password, dbName string) error {
 	// Подключаемся к базе по умолчанию "postgres"
 	defaultDB := "postgres"
 
-	// Удаление базы данных
 	var stderr bytes.Buffer
+
 	dropCmd := exec.Command(
-		//nolint:gosec
 		"psql",
 		defaultDB,
 		"-c",
-		fmt.Sprintf(`DROP DATABASE IF EXISTS "%s";`, dbName),
+		"DROP DATABASE IF EXISTS $1;",
 	)
 	dropCmd.Env = os.Environ()
 	dropCmd.Stderr = &stderr
+
+	dropCmd.Args = append(dropCmd.Args, dbName)
 
 	if err := dropCmd.Run(); err != nil {
 		log.Printf("Ошибка удаления базы данных: %v, %s", err, stderr.String())

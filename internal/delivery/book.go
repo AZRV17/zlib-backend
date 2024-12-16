@@ -291,6 +291,11 @@ func (h *Handler) deleteBook(c *gin.Context) {
 		return
 	}
 
+	if bookID < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid book ID"})
+		return
+	}
+
 	err = h.service.BookServ.DeleteBook(uint(bookID))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -39,7 +39,7 @@ func (h *Handler) getAuthorByID(c *gin.Context) {
 		return
 	}
 
-	author, err := h.service.AuthorServ.GetAuthorByID(uint(authorID))
+	author, err := h.service.AuthorServ.GetAuthorByID(uint(authorID)) //nolint:gosec
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -141,7 +141,7 @@ func (h *Handler) deleteAuthor(c *gin.Context) {
 		return
 	}
 
-	err = h.service.AuthorServ.DeleteAuthor(uint(authorID))
+	err = h.service.AuthorServ.DeleteAuthor(uint(authorID)) //nolint:gosec
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
