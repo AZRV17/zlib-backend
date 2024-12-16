@@ -1,28 +1,29 @@
 name: Linter
 
 on:
-    push:
-        branches:
-            - dev
-    pull_request:
-        branches:
-            - dev
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
 
 jobs:
-    lint:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v2
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-            - name: Set up Go
-              uses: actions/setup-go@v4
-              with:
-                  go-version: 1.23.1
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.1
 
-            - name: Run golangci-lint
-              uses: golangci/golangci-lint-action@v3
-              with:
-                  version: v1.54.2
-                  args: "--timeout 5m"
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
 
+      - name: Run golangci-lint with custom config
+        run: |
+          golangci-lint run --config .golangci.yml
