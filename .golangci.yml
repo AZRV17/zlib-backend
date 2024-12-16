@@ -1,0 +1,21 @@
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - unused
+  disable:
+    - lll
+    - gocyclo
+
+run:
+  timeout: 5m
+
+issues:
+  exclude-rules:
+    - path: ".*\\.go"
+      linters:
+        - errcheck
+      text: "error returned from"
+

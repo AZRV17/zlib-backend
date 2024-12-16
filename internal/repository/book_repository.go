@@ -17,9 +17,8 @@ func NewBookRepository(db *gorm.DB) *BookRepository {
 	return &BookRepository{DB: db}
 }
 
-func (b BookRepository) GetBookByID(id uint) (*domain.Book, error) {
+func (b *BookRepository) GetBookByID(id uint) (*domain.Book, error) {
 	var book domain.Book
-
 	tx := b.DB.Begin()
 
 	if err := tx.Model(&domain.Book{}).Preload("Author").Preload("Genre").Preload("Publisher").First(
@@ -38,7 +37,7 @@ func (b BookRepository) GetBookByID(id uint) (*domain.Book, error) {
 	return &book, nil
 }
 
-func (b BookRepository) GetBooks() ([]*domain.Book, error) {
+func (b *BookRepository) GetBooks() ([]*domain.Book, error) {
 	var books []*domain.Book
 
 	tx := b.DB.Begin()
@@ -61,7 +60,7 @@ func (b BookRepository) GetBooks() ([]*domain.Book, error) {
 	return books, nil
 }
 
-func (b BookRepository) CreateBook(book *domain.Book) error {
+func (b *BookRepository) CreateBook(book *domain.Book) error {
 	if err := b.DB.Model(&domain.Book{}).Create(book).Error; err != nil {
 		return err
 	}
@@ -69,7 +68,7 @@ func (b BookRepository) CreateBook(book *domain.Book) error {
 	return nil
 }
 
-func (b BookRepository) UpdateBook(book *domain.Book) error {
+func (b *BookRepository) UpdateBook(book *domain.Book) error {
 	if err := b.DB.Model(&domain.Book{}).Where("id = ?", book.ID).Save(book).Error; err != nil {
 		return err
 	}
@@ -77,7 +76,7 @@ func (b BookRepository) UpdateBook(book *domain.Book) error {
 	return nil
 }
 
-func (b BookRepository) DeleteBook(id uint) error {
+func (b *BookRepository) DeleteBook(id uint) error {
 	if err := b.DB.Model(&domain.Book{}).Delete(&domain.Book{}, id).Error; err != nil {
 		return err
 	}

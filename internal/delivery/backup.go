@@ -27,18 +27,15 @@ func (h *Handler) createBackup(c *gin.Context) {
 		h.config.Postgres.DB,
 	)
 
-	// Получаем данные бэкапа
 	backupData, err := psql.BackupDatabase(dsn)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Получаем текущее время для имени файла
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	filename := fmt.Sprintf("backup_%s.sql", timestamp)
 
-	// Устанавливаем заголовки для скачивания файла
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Header("Content-Type", "application/octet-stream")
@@ -48,10 +45,8 @@ func (h *Handler) createBackup(c *gin.Context) {
 	c.Header("Pragma", "public")
 	c.Header("Content-Length", fmt.Sprint(len(backupData)))
 
-	// Отправляем файл клиенту
 	c.Data(http.StatusOK, "application/octet-stream", backupData)
 
-	// Логируем действие
 	cookie, err := c.Request.Cookie("id")
 	if err != nil {
 		log.Printf("Error getting cookie for logging: %v", err)
@@ -65,14 +60,12 @@ func (h *Handler) createBackup(c *gin.Context) {
 }
 
 func (h *Handler) restoreBackup(c *gin.Context) {
-	// Получаем файл из формы
 	file, err := c.FormFile("backup")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "backup file is required"})
 		return
 	}
 
-	// Открываем загруженный файл
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot open uploaded file"})
@@ -80,7 +73,6 @@ func (h *Handler) restoreBackup(c *gin.Context) {
 	}
 	defer src.Close()
 
-	// Восстанавливаем базу данных из файла
 	err = psql.RestoreDatabase(
 		h.config.Postgres.Host,
 		h.config.Postgres.Port,

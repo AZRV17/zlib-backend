@@ -3,6 +3,7 @@ package service
 import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"log"
 )
 
 type ReviewService struct {
@@ -10,8 +11,11 @@ type ReviewService struct {
 	bookRepository repository.BookRepo
 }
 
-func NewReviewService(repo repository.ReviewRepo) *ReviewService {
-	return &ReviewService{repository: repo}
+func NewReviewService(repo repository.ReviewRepo, bookRepo repository.BookRepo) *ReviewService {
+	return &ReviewService{
+		repository:     repo,
+		bookRepository: bookRepo,
+	}
 }
 
 func (r ReviewService) GetReviewByID(id uint) (*domain.Review, error) {
@@ -23,12 +27,16 @@ func (r ReviewService) GetReviews() ([]*domain.Review, error) {
 }
 
 func (r ReviewService) CreateReview(reviewInput *CreateReviewInput) error {
+	log.Printf("ReviewInput: %v\n", reviewInput)
+
 	review := &domain.Review{
 		UserID:  reviewInput.UserID,
 		BookID:  reviewInput.BookID,
 		Rating:  reviewInput.Rating,
 		Message: reviewInput.Message,
 	}
+
+	log.Printf("Review: %v\n", review)
 
 	err := r.updateBookRating(review.BookID, review.Rating)
 	if err != nil {
@@ -60,11 +68,13 @@ func (r ReviewService) GetReviewsByBookID(id uint) ([]*domain.Review, error) {
 	return r.repository.GetReviewsByBookID(id)
 }
 
-func (r ReviewService) updateBookRating(bookID uint, rating float32) error {
+func (r *ReviewService) updateBookRating(bookID uint, rating float32) error {
 	book, err := r.bookRepository.GetBookByID(bookID)
 	if err != nil {
 		return err
 	}
+
+	log.Printf("Book: %v\n", book)
 
 	bookReviews, err := r.repository.GetReviewsByBookID(bookID)
 	if err != nil {

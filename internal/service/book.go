@@ -76,15 +76,6 @@ func (b BookService) UpdateBook(bookInput *UpdateBookInput) error {
 		return err
 	}
 
-	book.Title = bookInput.Title
-	book.AuthorID = bookInput.AuthorID
-	book.GenreID = bookInput.GenreID
-	book.PublisherID = bookInput.PublisherID
-	book.ISBN = bookInput.ISBN
-	book.YearOfPublication = bookInput.YearOfPublication
-	book.Picture = bookInput.Picture
-	book.Rating = bookInput.Rating
-
 	return b.bookRepo.UpdateBook(book)
 }
 
@@ -183,11 +174,11 @@ func (b BookService) ReserveBook(bookID, userID uint) (*domain.UniqueCode, error
 	return code, nil
 }
 
-func (b *BookService) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
+func (b BookService) GetUniqueCodeByID(id uint) (*domain.UniqueCode, error) {
 	return b.bookRepo.GetUniqueCodeByID(id)
 }
 
-func (b *BookService) GetBooksWithPagination(offset, limit int) ([]*domain.Book, error) {
+func (b BookService) GetBooksWithPagination(offset, limit int) ([]*domain.Book, error) {
 	books, err := b.bookRepo.GetBooksWithPagination(offset, limit)
 	if err != nil {
 		return nil, err
@@ -204,6 +195,6 @@ func (b *BookService) GetBooksWithPagination(offset, limit int) ([]*domain.Book,
 	return books, nil
 }
 
-func (b *BookService) FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error) {
+func (b BookService) FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error) {
 	return b.bookRepo.FindBookByTitle(limit, offset, title)
 }

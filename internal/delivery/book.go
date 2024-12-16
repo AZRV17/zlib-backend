@@ -185,9 +185,9 @@ type updateBookInput struct {
 	ID                uint      `form:"id"`
 	Title             string    `form:"title"`
 	Description       string    `form:"description"`
-	AuthorID          uint      `form:"author"`
-	GenreID           uint      `form:"genre"`
-	PublisherID       uint      `form:"publisher"`
+	AuthorID          uint      `form:"author_id"`
+	GenreID           uint      `form:"genre_id"`
+	PublisherID       uint      `form:"publisher_id"`
 	ISBN              int       `form:"isbn"`
 	YearOfPublication time.Time `form:"year_of_publication"`
 	Rating            float32   `form:"rating"`

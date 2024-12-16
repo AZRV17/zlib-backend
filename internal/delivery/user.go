@@ -232,8 +232,8 @@ func (h *Handler) logout(c *gin.Context) {
 		c.Writer, &http.Cookie{
 			Name:     "id",
 			Value:    "0", //nolint:gosec
-			Path:     "/", // Убедитесь, что Path совпадает
-			MaxAge:   -1,  // MaxAge=-1 означает немедленное удаление
+			Path:     "/",
+			MaxAge:   -1,
 			Secure:   false,
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,

@@ -285,7 +285,7 @@ func NewService(repo *repository.Repository, db *gorm.DB) *Service {
 		NotificationServ: NewNotificationService(repo.NotificationRepo),
 		PublisherServ:    NewPublisherService(repo.PublisherRepo),
 		ReservationServ:  NewReservationService(repo.ReservationRepo),
-		ReviewServ:       NewReviewService(repo.ReviewRepo),
+		ReviewServ:       NewReviewService(repo.ReviewRepo, repo.BookRepo),
 		UserServ:         NewUserService(repo.UserRepo),
 	}
 }

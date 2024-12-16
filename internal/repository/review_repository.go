@@ -13,7 +13,7 @@ func NewReviewRepository(db *gorm.DB) *ReviewRepository {
 	return &ReviewRepository{DB: db}
 }
 
-func (r ReviewRepository) GetReviewByID(id uint) (*domain.Review, error) {
+func (r *ReviewRepository) GetReviewByID(id uint) (*domain.Review, error) {
 	var review domain.Review
 
 	tx := r.DB.Begin()
@@ -32,7 +32,7 @@ func (r ReviewRepository) GetReviewByID(id uint) (*domain.Review, error) {
 	return &review, nil
 }
 
-func (r ReviewRepository) GetReviews() ([]*domain.Review, error) {
+func (r *ReviewRepository) GetReviews() ([]*domain.Review, error) {
 	var reviews []*domain.Review
 
 	tx := r.DB.Begin()
@@ -51,7 +51,7 @@ func (r ReviewRepository) GetReviews() ([]*domain.Review, error) {
 	return reviews, nil
 }
 
-func (r ReviewRepository) CreateReview(review *domain.Review) error {
+func (r *ReviewRepository) CreateReview(review *domain.Review) error {
 	tx := r.DB.Begin()
 
 	if err := tx.Create(review).Error; err != nil {
@@ -68,7 +68,7 @@ func (r ReviewRepository) CreateReview(review *domain.Review) error {
 	return nil
 }
 
-func (r ReviewRepository) UpdateReview(review *domain.Review) error {
+func (r *ReviewRepository) UpdateReview(review *domain.Review) error {
 	tx := r.DB.Begin()
 
 	if err := tx.Where("id = ?", review.ID).Save(review).Error; err != nil {
@@ -85,7 +85,7 @@ func (r ReviewRepository) UpdateReview(review *domain.Review) error {
 	return nil
 }
 
-func (r ReviewRepository) DeleteReview(id uint) error {
+func (r *ReviewRepository) DeleteReview(id uint) error {
 	tx := r.DB.Begin()
 
 	if err := tx.Delete(&domain.Review{}, id).Error; err != nil {

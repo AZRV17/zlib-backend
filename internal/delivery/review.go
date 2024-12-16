@@ -3,6 +3,7 @@ package delivery
 import (
 	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -51,12 +52,16 @@ func (h *Handler) createReview(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Review in del: %v\n", input)
+
 	serviceCreateReviewInput := &service.CreateReviewInput{
 		UserID:  uint(userIDInt), //nolint:gosec
 		BookID:  input.BookID,
 		Rating:  input.Rating,
 		Message: input.Message,
 	}
+
+	log.Printf("Review in serv: %v\n", serviceCreateReviewInput)
 
 	err = h.service.ReviewServ.CreateReview(serviceCreateReviewInput)
 	if err != nil {

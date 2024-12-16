@@ -53,19 +53,9 @@ func (u UserRepository) GetUsers() ([]*domain.User, error) {
 func (u UserRepository) SignInByLogin(login, password string) (*domain.User, error) {
 	var user domain.User
 
-	tx := u.DB.Begin()
+	err := u.DB.Raw("SELECT * FROM sign_in(?, ?)", login, password).Scan(user).Error
 
-	if err := tx.Where("login = ? AND password = ?", login, password).First(&user).Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-
-	err := tx.Commit().Error
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return &user, err
 }
 
 func (u UserRepository) SignInByEmail(email, password string) (*domain.User, error) {
