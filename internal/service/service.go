@@ -48,6 +48,7 @@ type CreateBookInput struct {
 	YearOfPublication time.Time `json:"year_of_publication"`
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
+	EpubFile          string    `json:"epub_file"`
 }
 
 type UpdateBookInput struct {
@@ -64,6 +65,7 @@ type UpdateBookInput struct {
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
 	IsAvailable       bool      `json:"is_available"`
+	EpubFile          string    `json:"epub_file"`
 }
 
 type BookServ interface {
@@ -84,6 +86,13 @@ type BookServ interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
+
+	// методы для аудиокниг
+	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
+	GetAudiobookFileByID(id uint) (*domain.AudiobookFile, error)
+	CreateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error
+	UpdateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error
+	DeleteAudiobookFile(id uint) error
 }
 
 type CreateFavoriteInput struct {
@@ -260,6 +269,19 @@ type UserServ interface {
 	comparePasswords(hashedPassword, password string) bool
 }
 
+type ChatServ interface {
+	CreateChat(chat *domain.Chat) error
+	GetChatByID(chatID uint) (*domain.Chat, error)
+	GetMessagesByChatID(chatID uint) ([]domain.Message, error)
+	GetActiveChatsForLibrarian() ([]domain.Chat, error)
+	GetChatsByUserID(userID uint) ([]domain.Chat, error)
+	AssignLibrarianToChat(chatID, librarianID uint) error
+	CloseChat(chatID uint) error
+	MarkMessagesAsRead(chatID, userID uint) error
+	GetLibrarianChats(librarianID uint) ([]domain.Chat, error)
+	GetUnassignedChats() ([]domain.Chat, error)
+}
+
 type Service struct {
 	repo *repository.Repository
 	AuthorServ
@@ -272,6 +294,7 @@ type Service struct {
 	ReservationServ
 	ReviewServ
 	UserServ
+	ChatServ
 }
 
 func NewService(repo *repository.Repository, db *gorm.DB) *Service {
@@ -287,5 +310,6 @@ func NewService(repo *repository.Repository, db *gorm.DB) *Service {
 		ReservationServ:  NewReservationService(repo.ReservationRepo),
 		ReviewServ:       NewReviewService(repo.ReviewRepo),
 		UserServ:         NewUserService(repo.UserRepo),
+		ChatServ:         NewChatService(repo.ChatRepo),
 	}
 }

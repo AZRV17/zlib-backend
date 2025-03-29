@@ -345,3 +345,93 @@ func (b BookRepository) ExportBooksToCSV() ([]byte, error) {
 
 	return buf.Bytes(), nil
 }
+
+func (b BookRepository) SortBooksByTitle() ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).Order("title").
+		Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return nil, err
+	}
+
+	return books, nil
+}
+
+func (b BookRepository) GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error) {
+	tx := b.DB.Begin()
+
+	var files []*domain.AudiobookFile
+
+	if err := tx.Model(&domain.AudiobookFile{}).Where("book_id = ?", bookID).Find(&files).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return files, nil
+}
+
+func (b BookRepository) GetAudiobookFileByID(id uint) (*domain.AudiobookFile, error) {
+	tx := b.DB.Begin()
+
+	var file domain.AudiobookFile
+
+	if err := tx.Model(&domain.AudiobookFile{}).First(&file, id).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return &file, nil
+}
+
+func (b BookRepository) CreateAudiobookFile(file *domain.AudiobookFile) error {
+	tx := b.DB.Begin()
+
+	if err := tx.Create(file).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func (b BookRepository) UpdateAudiobookFile(file *domain.AudiobookFile) error {
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.AudiobookFile{}).Where("id = ?", file.ID).Save(file).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func (b BookRepository) DeleteAudiobookFile(id uint) error {
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.AudiobookFile{}).Delete(&domain.AudiobookFile{}, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}

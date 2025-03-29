@@ -38,6 +38,13 @@ type BookRepo interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
+
+	// Методы для работы с аудиофайлами книги
+	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
+	GetAudiobookFileByID(id uint) (*domain.AudiobookFile, error)
+	CreateAudiobookFile(file *domain.AudiobookFile) error
+	UpdateAudiobookFile(file *domain.AudiobookFile) error
+	DeleteAudiobookFile(id uint) error
 }
 
 type FavoriteRepo interface {
@@ -125,6 +132,20 @@ type UserRepo interface {
 	UpdateUserRole(id uint, role domain.Role) error
 }
 
+type ChatRepo interface {
+	SaveMessage(message *domain.Message) error
+	CreateChat(chat *domain.Chat) error
+	GetChatByID(chatID uint) (*domain.Chat, error)
+	GetMessagesByChatID(chatID uint) ([]domain.Message, error)
+	GetActiveChatsForLibrarian() ([]domain.Chat, error)
+	GetChatsByUserID(userID uint) ([]domain.Chat, error)
+	AssignLibrarianToChat(chatID, librarianID uint) error
+	CloseChat(chatID uint) error
+	MarkMessagesAsRead(chatID, userID uint) error
+	GetLibrarianChats(librarianID uint) ([]domain.Chat, error)
+	GetUnassignedChats() ([]domain.Chat, error)
+}
+
 type Repository struct {
 	DB *gorm.DB
 	AuthorRepo
@@ -137,6 +158,7 @@ type Repository struct {
 	ReservationRepo
 	ReviewRepo
 	UserRepo
+	ChatRepo
 }
 
 func NewRepository(db *gorm.DB) Repository {
@@ -152,5 +174,6 @@ func NewRepository(db *gorm.DB) Repository {
 		ReservationRepo:  NewReservationRepository(db.Model(&domain.Reservation{})),
 		ReviewRepo:       NewReviewRepository(db.Model(&domain.Review{})),
 		UserRepo:         NewUserRepository(db.Model(&domain.User{})),
+		ChatRepo:         NewChatRepository(db),
 	}
 }

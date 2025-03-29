@@ -55,7 +55,8 @@ func (u UserRepository) SignInByLogin(login, password string) (*domain.User, err
 
 	tx := u.DB.Begin()
 
-	if err := tx.Where("login = ? AND password = ?", login, password).First(&user).Error; err != nil {
+	if err := tx.Raw("SELECT * FROM sign_in(?, ?)", login, password).
+		Scan(&user).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package service
 import (
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"strings"
 )
 
 type ReservationService struct {
@@ -51,5 +52,17 @@ func (r ReservationService) DeleteReservation(id uint) error {
 }
 
 func (r ReservationService) GetReservationsByUserID(id uint) ([]*domain.Reservation, error) {
-	return r.repository.GetUserReservations(id)
+	reservations, err := r.repository.GetUserReservations(id)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, reservation := range reservations {
+		if reservation.Book.Picture == "" || strings.HasPrefix(reservation.Book.Picture, "http") {
+			continue
+		}
+		reservation.Book.Picture = "http://localhost:8080/" + reservation.Book.Picture
+	}
+
+	return reservations, nil
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/delivery"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	httpserver "github.com/AZRV17/zlib-backend/internal/server/http"
+	"github.com/AZRV17/zlib-backend/internal/server/metrics"
+	ws "github.com/AZRV17/zlib-backend/internal/server/websocket"
 	serv "github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/AZRV17/zlib-backend/pkg/db/psql"
 	"github.com/gin-contrib/cors"
@@ -18,6 +20,7 @@ import (
 	"time"
 )
 
+//nolint:funlen
 func Run() {
 	cfg, err := config.NewConfig("internal/config/config.yaml")
 	if err != nil {
@@ -68,11 +71,18 @@ func Run() {
 	// Первый параметр - это URL путь, второй - путь к папке на сервере
 	r.Static("/uploads", "./uploads")
 
-	handler := delivery.NewHandler(*service, cfg)
+	chatHub := ws.NewChatHub(repo.ChatRepo, service.UserServ)
+
+	go chatHub.HandleMessages()
+
+	handler := delivery.NewHandler(*service, cfg, chatHub)
 
 	handler.Init(r)
 
 	server := httpserver.NewHTTPServer(cfg, r)
+
+	metrics.InitInfluxDB()
+	defer metrics.CloseInfluxDB()
 
 	stoppedHTTP := make(chan struct{})
 

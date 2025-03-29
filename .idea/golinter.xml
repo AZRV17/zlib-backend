@@ -15,7 +15,6 @@
         <option value="gocognit" />
         <option value="ineffassign" />
         <option value="bodyclose" />
-        <option value="gosec" />
         <option value="maligned" />
         <option value="stylecheck" />
         <option value="revive" />

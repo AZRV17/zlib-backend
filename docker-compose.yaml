@@ -1,0 +1,89 @@
+version: '3.9'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus:/etc/prometheus/
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    restart: always
+    environment:
+      - TZ="Europe/Moscow"
+    networks:
+      - monitoring
+
+
+  grafana:
+    image: grafana/grafana:latest
+    user: root
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    container_name: grafana
+    hostname: grafana
+    restart: always
+    environment:
+      - TZ="Europe/Moscow"
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=smtp.mail.ru:465
+      - GF_SMTP_USER=skylang@inbox.ru
+      - GF_SMTP_PASSWORD=Ad1Gt0csfGJ94YhttqLZ
+      - GF_SMTP_FROM_ADDRESS=skylang@inbox.ru
+      - GF_SMTP_STARTTLS_POLICY=Mandatory
+    networks:
+      - monitoring
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    hostname: influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib
+      - etc_influxdb2_data:/etc/influxdb2
+      - influxdb2_data:/var/lib/influxdb2
+    restart: always
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - monitoring
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    network_mode: "host"
+    hostname: telegraf
+    depends_on:
+      - influxdb
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/rootfs/sys:ro
+      - /proc:/rootfs/proc:ro
+      - /etc:/rootfs/etc:ro
+    restart: always
+    environment:
+      TZ: "Europe/Moscow"
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+    privileged: true
+
+
+networks:
+  monitoring:
+
+volumes:
+    influxdb_data:
+    etc_influxdb2_data:
+    influxdb2_data:

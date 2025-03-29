@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
-	"log"
 	"strconv"
 )
 
@@ -75,9 +74,6 @@ func (f FavoriteRepository) GetFavoritesByUserID(id uint) ([]*domain.Favorite, e
 		tx.Rollback()
 		return nil, err
 	}
-
-	log.Printf("Favorites: %v\n", favorites)
-	log.Println(id)
 
 	err := tx.Commit().Error
 	if err != nil {
