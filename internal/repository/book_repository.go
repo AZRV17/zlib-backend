@@ -70,7 +70,15 @@ func (b BookRepository) CreateBook(book *domain.Book) error {
 }
 
 func (b BookRepository) UpdateBook(book *domain.Book) error {
-	if err := b.DB.Model(&domain.Book{}).Where("id = ?", book.ID).Save(book).Error; err != nil {
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).Where("id = ?", book.ID).Save(book).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
 		return err
 	}
 
@@ -272,7 +280,7 @@ func (b BookRepository) GetBooksWithPagination(limit int, offset int) ([]*domain
 
 	tx := b.DB.Begin()
 
-	if err := tx.Model(&domain.Book{}).Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+	if err := tx.Model(&domain.Book{}).Limit(limit).Offset(offset).Preload("Genre").Preload("Author").Find(&books).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}

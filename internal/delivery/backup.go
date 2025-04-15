@@ -65,14 +65,12 @@ func (h *Handler) createBackup(c *gin.Context) {
 }
 
 func (h *Handler) restoreBackup(c *gin.Context) {
-	// Получаем файл из формы
 	file, err := c.FormFile("backup")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "backup file is required"})
 		return
 	}
 
-	// Открываем загруженный файл
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot open uploaded file"})
@@ -80,7 +78,6 @@ func (h *Handler) restoreBackup(c *gin.Context) {
 	}
 	defer src.Close()
 
-	// Восстанавливаем базу данных из файла
 	err = psql.RestoreDatabase(
 		h.config.Postgres.Host,
 		h.config.Postgres.Port,
@@ -94,7 +91,6 @@ func (h *Handler) restoreBackup(c *gin.Context) {
 		return
 	}
 
-	// Логируем действие
 	cookie, err := c.Request.Cookie("id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -1,7 +1,6 @@
 package delivery
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -14,6 +13,7 @@ func (h *Handler) initReservationRoutes(r *gin.Engine) {
 		reservations.Use(h.AuthMiddleware).GET("/:id", h.getReservationByID)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/", h.getAllReservations)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).PATCH("/:id", h.updateReservationStatus)
+		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id", h.updateReservationStatus)
 	}
 }
 
@@ -92,27 +92,7 @@ func (h *Handler) updateReservationStatus(c *gin.Context) {
 		return
 	}
 
-	reservation, err := h.service.ReservationServ.GetReservationByID(uint(reservationID)) //nolint:gosec
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	reservation.Status = input.Status
-	err = h.service.ReservationServ.UpdateReservation(
-		&service.UpdateReservationInput{
-			ID:           reservation.ID,
-			UserID:       reservation.UserID,
-			BookID:       reservation.BookID,
-			Status:       reservation.Status,
-			DateOfReturn: reservation.DateOfReturn,
-			DateOfIssue:  reservation.DateOfIssue,
-		},
-	)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	err = h.service.ReservationServ.UpdateReservationStatus(uint(reservationID), input.Status) //nolint:gosec
 
 	cookie, err := c.Request.Cookie("id")
 	if err != nil {

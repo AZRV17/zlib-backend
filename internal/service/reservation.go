@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"strings"
@@ -8,10 +9,11 @@ import (
 
 type ReservationService struct {
 	repository repository.ReservationRepo
+	bookRepo   repository.BookRepo
 }
 
-func NewReservationService(repo repository.ReservationRepo) *ReservationService {
-	return &ReservationService{repository: repo}
+func NewReservationService(repo repository.ReservationRepo, bookRepo repository.BookRepo) *ReservationService {
+	return &ReservationService{repository: repo, bookRepo: bookRepo}
 }
 
 func (r ReservationService) GetReservationByID(id uint) (*domain.Reservation, error) {
@@ -65,4 +67,39 @@ func (r ReservationService) GetReservationsByUserID(id uint) ([]*domain.Reservat
 	}
 
 	return reservations, nil
+}
+
+func (r ReservationService) UpdateReservationStatus(id uint, status string) error {
+	reservation, err := r.repository.GetReservationByID(id)
+	if err != nil {
+		return fmt.Errorf("не удалось найти бронирование: %w", err)
+	}
+
+	reservation.Status = status
+	if err := r.repository.UpdateReservation(reservation); err != nil {
+		return fmt.Errorf("ошибка обновления статуса бронирования: %w", err)
+	}
+
+	if status == "returned" {
+		if err := r.makeUniqueCodeAvailable(reservation.UniqueCodeID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r ReservationService) makeUniqueCodeAvailable(codeID uint) error {
+	code, err := r.bookRepo.GetUniqueCodeByID(codeID)
+	if err != nil {
+		return fmt.Errorf("ошибка получения уникального кода: %w", err)
+	}
+
+	code.IsAvailable = true
+
+	if err := r.bookRepo.UpdateUniqueCode(code); err != nil {
+		return fmt.Errorf("ошибка обновления уникального кода: %w", err)
+	}
+
+	return nil
 }

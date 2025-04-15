@@ -61,6 +61,7 @@ type UpdateBookInput struct {
 	PublisherID       uint      `json:"publisher_id"`
 	Publisher         uint      `json:"publisher"`
 	ISBN              int       `json:"isbn"`
+	Description       string    `json:"description"`
 	YearOfPublication time.Time `json:"year_of_publication"`
 	Picture           string    `json:"picture"`
 	Rating            float32   `json:"rating"`
@@ -93,6 +94,7 @@ type BookServ interface {
 	CreateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error
 	UpdateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error
 	DeleteAudiobookFile(id uint) error
+	UpdateAudiobookFileOrder(file_id uint, order int) error
 }
 
 type CreateFavoriteInput struct {
@@ -206,6 +208,7 @@ type ReservationServ interface {
 	UpdateReservation(reservationInput *UpdateReservationInput) error
 	DeleteReservation(id uint) error
 	GetReservationsByUserID(id uint) ([]*domain.Reservation, error)
+	UpdateReservationStatus(id uint, status string) error
 }
 
 type CreateReviewInput struct {
@@ -307,7 +310,7 @@ func NewService(repo *repository.Repository, db *gorm.DB) *Service {
 		LogServ:          NewLogService(repo.LogRepo),
 		NotificationServ: NewNotificationService(repo.NotificationRepo),
 		PublisherServ:    NewPublisherService(repo.PublisherRepo),
-		ReservationServ:  NewReservationService(repo.ReservationRepo),
+		ReservationServ:  NewReservationService(repo.ReservationRepo, repo.BookRepo),
 		ReviewServ:       NewReviewService(repo.ReviewRepo),
 		UserServ:         NewUserService(repo.UserRepo),
 		ChatServ:         NewChatService(repo.ChatRepo),

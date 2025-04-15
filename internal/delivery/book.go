@@ -23,7 +23,6 @@ func (h *Handler) initBookRoutes(r *gin.Engine) {
 		books.GET("/", h.getAllBooks)
 		books.GET("/:id", h.getBookByID)
 		books.GET("/grouped", h.getGroupedBooksByTitle)
-		//books.GET("/pagination", h.findBookByTitle)
 		books.GET("/pagination", h.getBooksWithPagination)
 		books.GET("/:id/audio", h.getBookAudiobookFiles)
 		books.GET("/audio/:id", h.serveAudioFile)
@@ -34,6 +33,7 @@ func (h *Handler) initBookRoutes(r *gin.Engine) {
 		books.Use(h.AuthMiddleware, h.LibrarianMiddleware).DELETE("/:id", h.deleteBook)
 		books.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/", h.createBook)
 		books.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/:id/audio/upload", h.uploadAudiobookFiles)
+		books.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id/audio/:audio_id/reorder", h.reorderAudioBookFile)
 	}
 }
 
@@ -66,9 +66,9 @@ func (h *Handler) getBookByID(c *gin.Context) {
 type createBookInput struct {
 	Title             string    `form:"title"`
 	Description       string    `form:"description"`
-	AuthorID          uint      `form:"author_id"`
-	GenreID           uint      `form:"genre_id"`
-	PublisherID       uint      `form:"publisher_id"`
+	AuthorID          uint      `form:"author"`
+	GenreID           uint      `form:"genre"`
+	PublisherID       uint      `form:"publisher"`
 	ISBN              int       `form:"isbn"`
 	YearOfPublication time.Time `form:"year_of_publication"`
 	Rating            float32   `form:"rating"`
@@ -219,56 +219,61 @@ type updateBookInput struct {
 func (h *Handler) updateBook(c *gin.Context) {
 	var input updateBookInput
 
-	// Bind form data except file
 	if err := c.ShouldBind(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Get existing book to check old picture path
 	existingBook, err := h.service.BookServ.GetBookByID(input.ID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
 		return
 	}
 
-	picturePath := existingBook.Picture // Keep old picture path by default
+	picturePath := existingBook.Picture
+	epubPath := existingBook.EpubFile
 
-	// Check if new file is uploaded
-	file, err := c.FormFile("picture")
-	if err == nil { // New file was uploaded
-		// Check file type
+	// Обработка новой картинки
+	if file, err := c.FormFile("picture"); err == nil {
 		if !isAllowedFileType(file.Header.Get("Content-Type")) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file type. Only images are allowed"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file type"})
 			return
 		}
 
-		// Generate unique filename
 		filename := generateUniqueFilename(file.Filename)
-
-		// Create uploads directory if it doesn't exist
 		uploadsDir := "uploads/books"
 		if err := os.MkdirAll(uploadsDir, 0755); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create uploads directory"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
 			return
 		}
 
-		// Save new file
-		newFilePath := filepath.Join(uploadsDir, filename)
+		newFilePath := filepath.Join(uploadsDir, filename+".jpg")
 		if err := c.SaveUploadedFile(file, newFilePath); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
 			return
 		}
 
-		// Delete old file if it exists
 		if existingBook.Picture != "" {
-			if err := os.Remove(existingBook.Picture); err != nil {
-				// Log error but continue, as this is not critical
-				log.Printf("Failed to delete old file: %v", err)
-			}
+			os.Remove(existingBook.Picture)
+		}
+		picturePath = newFilePath
+	}
+
+	// Обработка нового EPUB файла
+	if epubFile, err := c.FormFile("epub"); err == nil {
+		filename := generateUniqueFilename(epubFile.Filename)
+		uploadsDir := "uploads/books"
+		newEpubPath := filepath.Join(uploadsDir, filename+".epub")
+
+		if err := c.SaveUploadedFile(epubFile, newEpubPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save epub"})
+			return
 		}
 
-		picturePath = newFilePath
+		if existingBook.EpubFile != "" {
+			os.Remove(existingBook.EpubFile)
+		}
+		epubPath = newEpubPath
 	}
 
 	book := service.UpdateBookInput{
@@ -276,18 +281,16 @@ func (h *Handler) updateBook(c *gin.Context) {
 		Title:             input.Title,
 		AuthorID:          input.AuthorID,
 		GenreID:           input.GenreID,
+		Description:       input.Description,
 		PublisherID:       input.PublisherID,
 		ISBN:              input.ISBN,
 		YearOfPublication: input.YearOfPublication,
 		Picture:           picturePath,
 		Rating:            input.Rating,
+		EpubFile:          epubPath,
 	}
 
 	if err := h.service.BookServ.UpdateBook(&book); err != nil {
-		// If update fails and we uploaded a new file, clean it up
-		if picturePath != existingBook.Picture {
-			os.Remove(picturePath)
-		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -298,8 +301,7 @@ func (h *Handler) updateBook(c *gin.Context) {
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение книги")
-	if err != nil {
+	if err := h.service.LogServ.CreateLogWithCookie(cookie, "Изменение книги"); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -628,4 +630,42 @@ func (h *Handler) serveAudioFile(c *gin.Context) {
 
 	// Отправляем файл клиенту
 	c.File(fullPath)
+}
+
+type orderChangeInput struct {
+	NewOrder int `json:"new_order"`
+}
+
+func (h *Handler) reorderAudioBookFile(c *gin.Context) {
+	// Получаем ID аудиофайла из параметров запроса
+	fileIDStr := c.Param("audio_id")
+	fileID, err := strconv.ParseUint(fileIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file ID"})
+		return
+	}
+
+	// Получаем новый порядок из тела запроса
+	var input orderChangeInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	newOrder := input.NewOrder
+	// Проверяем, существует ли аудиофайл
+	audioFile, err := h.service.BookServ.GetAudiobookFileByID(uint(fileID))
+	if err != nil || audioFile == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "audio file not found"})
+		return
+	}
+
+	// Обновляем порядок в базе данных
+	err = h.service.BookServ.UpdateAudiobookFileOrder(uint(fileID), newOrder)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update order"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "audiobook file order updated successfully"})
 }

@@ -16,15 +16,6 @@ var (
 		}, []string{"path", "method", "status"},
 	)
 
-	DBQueryDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace: "zlib",
-			Name:      "db_query_duration_seconds",
-			Help:      "Duration of database queries in seconds",
-			Buckets:   prometheus.DefBuckets,
-		}, []string{"operation"},
-	)
-
 	ActiveIPs = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "zlib",

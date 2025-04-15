@@ -171,7 +171,7 @@ func NewRepository(db *gorm.DB) Repository {
 		LogRepo:          NewLogRepository(db.Model(&domain.Log{})),
 		NotificationRepo: NewNotificationRepository(db.Model(&domain.Notification{})),
 		PublisherRepo:    NewPublisherRepository(db.Model(&domain.Publisher{})),
-		ReservationRepo:  NewReservationRepository(db.Model(&domain.Reservation{})),
+		ReservationRepo:  NewReservationRepository(db),
 		ReviewRepo:       NewReviewRepository(db.Model(&domain.Review{})),
 		UserRepo:         NewUserRepository(db.Model(&domain.User{})),
 		ChatRepo:         NewChatRepository(db),

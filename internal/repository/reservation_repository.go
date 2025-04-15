@@ -113,11 +113,20 @@ func (r ReservationRepository) CreateReservationWithTransactions(reservation *do
 func (r ReservationRepository) GetUserReservations(id uint) ([]*domain.Reservation, error) {
 	var reservations []*domain.Reservation
 
-	if err := r.DB.Where(
+	tx := r.DB.Begin()
+
+	if err := tx.Where(
 		"user_id = ?",
 		id,
 	).Preload("Book").Preload("Book.Author").Preload("Book.Genre").Preload("Book.Publisher").
 		Find(&reservations).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
 		return nil, err
 	}
 

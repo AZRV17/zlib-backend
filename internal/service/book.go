@@ -7,6 +7,7 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,6 +82,8 @@ func (b BookService) UpdateBook(bookInput *UpdateBookInput) error {
 		return err
 	}
 
+	log.Println("bookInput", bookInput)
+
 	book.Title = bookInput.Title
 	book.AuthorID = bookInput.AuthorID
 	book.GenreID = bookInput.GenreID
@@ -90,6 +93,7 @@ func (b BookService) UpdateBook(bookInput *UpdateBookInput) error {
 	book.Picture = bookInput.Picture
 	book.Rating = bookInput.Rating
 	book.EpubFile = bookInput.EpubFile
+	book.Description = bookInput.Description
 
 	return b.bookRepo.UpdateBook(book)
 }
@@ -224,75 +228,70 @@ func (b BookService) GetAudiobookFileByID(id uint) (*domain.AudiobookFile, error
 }
 
 func (b BookService) CreateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error {
-	// Генерируем уникальное имя файла
 	fileName := fmt.Sprintf("%s.mp3", uuid.New().String())
 	savePath := filepath.Join("uploads", "audio", fileName)
 
-	// Создаём директорию, если её нет
 	if err := os.MkdirAll("uploads/audio", os.ModePerm); err != nil {
 		return fmt.Errorf("ошибка при создании папки: %w", err)
 	}
 
-	// Сохраняем файл
 	if err := os.WriteFile(savePath, fileData, 0644); err != nil {
 		return fmt.Errorf("ошибка при сохранении аудиофайла: %w", err)
 	}
 
-	// Записываем путь к файлу в структуру
 	file.FilePath = savePath
 
-	// Сохраняем в БД
 	return b.bookRepo.CreateAudiobookFile(file)
 }
 
 func (b BookService) UpdateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error {
-	// Получаем текущий файл из БД
 	oldFile, err := b.bookRepo.GetAudiobookFileByID(file.ID)
 	if err != nil {
 		return fmt.Errorf("ошибка при поиске аудиофайла: %w", err)
 	}
 
-	// Если переданы новые данные, заменяем файл
 	if len(fileData) > 0 {
-		// Удаляем старый файл
 		if oldFile.FilePath != "" {
 			_ = os.Remove(oldFile.FilePath)
 		}
 
-		// Генерируем новое имя
 		fileName := fmt.Sprintf("%s.mp3", uuid.New().String())
 		savePath := filepath.Join("uploads", "audio", fileName)
 
-		// Записываем новый файл
 		if err := os.WriteFile(savePath, fileData, 0644); err != nil {
 			return fmt.Errorf("ошибка при сохранении нового аудиофайла: %w", err)
 		}
 
-		// Обновляем путь в структуре
 		file.FilePath = savePath
 	} else {
-		// Если новый файл не передан, оставляем старый путь
 		file.FilePath = oldFile.FilePath
 	}
 
-	// Обновляем запись в БД
 	return b.bookRepo.UpdateAudiobookFile(file)
 }
 
 func (b BookService) DeleteAudiobookFile(id uint) error {
-	// Получаем файл из БД
 	file, err := b.bookRepo.GetAudiobookFileByID(id)
 	if err != nil {
 		return fmt.Errorf("ошибка при поиске аудиофайла: %w", err)
 	}
 
-	// Удаляем файл из файловой системы
 	if file.FilePath != "" {
 		if err := os.Remove(file.FilePath); err != nil {
 			return fmt.Errorf("ошибка при удалении аудиофайла: %w", err)
 		}
 	}
 
-	// Удаляем запись из БД
 	return b.bookRepo.DeleteAudiobookFile(id)
+}
+
+func (b BookService) UpdateAudiobookFileOrder(fileID uint, order int) error {
+	file, err := b.bookRepo.GetAudiobookFileByID(fileID)
+	if err != nil {
+		return fmt.Errorf("ошибка при поиске аудиофайла: %w", err)
+	}
+
+	file.Order = order
+
+	return b.bookRepo.UpdateAudiobookFile(file)
 }
