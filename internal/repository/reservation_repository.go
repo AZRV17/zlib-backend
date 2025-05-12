@@ -1,8 +1,12 @@
 package repository
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
+	"strconv"
 )
 
 type ReservationRepository struct {
@@ -131,4 +135,44 @@ func (r ReservationRepository) GetUserReservations(id uint) ([]*domain.Reservati
 	}
 
 	return reservations, nil
+}
+
+func (r ReservationRepository) ExportReservationsToCSV() ([]byte, error) {
+	reservations, err := r.GetReservations()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+
+	headers := []string{"ID", "Пользователь", "Книга", "Код", "Статус", "Дата бронирования", "Дата возврата"}
+
+	if err := writer.Write(headers); err != nil {
+		return nil, err
+	}
+
+	for _, reservation := range reservations {
+		row := []string{
+			strconv.FormatUint(uint64(reservation.ID), 10),
+			reservation.User.Login,
+			reservation.Book.Title,
+			strconv.Itoa(reservation.UniqueCode.Code),
+			reservation.Status,
+			reservation.DateOfIssue.Format("2006-01-02"),
+			reservation.DateOfReturn.Format("2006-01-02"),
+		}
+
+		if err := writer.Write(row); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

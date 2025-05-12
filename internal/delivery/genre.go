@@ -1,10 +1,14 @@
 package delivery
 
 import (
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (h *Handler) initGenreRoutes(r *gin.Engine) {
@@ -15,6 +19,8 @@ func (h *Handler) initGenreRoutes(r *gin.Engine) {
 		genres.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/", h.createGenre)
 		genres.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id", h.updateGenre)
 		genres.Use(h.AuthMiddleware, h.LibrarianMiddleware).DELETE("/:id", h.deleteGenre)
+		genres.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/export", h.exportGenresToCSV)
+		genres.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/import", h.importGenresFromCSV)
 	}
 }
 
@@ -128,4 +134,92 @@ func (h *Handler) deleteGenre(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "genre deleted"})
+}
+
+func (h *Handler) exportGenresToCSV(c *gin.Context) {
+	genreData, err := h.service.GenreServ.ExportGenresToCSV()
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filename := "genres.csv"
+
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Expires", "0")
+	c.Header("Cache-Control", "must-revalidate")
+	c.Header("Pragma", "public")
+	c.Header("Content-Length", fmt.Sprint(len(genreData)))
+
+	c.Data(http.StatusOK, "text/csv", genreData)
+
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		log.Printf("Error getting cookie for logging: %v", err)
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт жанров в CSV")
+	if err != nil {
+		log.Printf("Error creating log: %v", err)
+	}
+}
+
+func (h *Handler) importGenresFromCSV(c *gin.Context) {
+	// Получаем файл из запроса
+	file, err := c.FormFile("csv")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "не удалось получить CSV файл: " + err.Error()})
+		return
+	}
+
+	// Проверяем расширение файла
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".csv") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "файл должен быть в формате CSV"})
+		return
+	}
+
+	// Открываем файл
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось открыть файл: " + err.Error()})
+		return
+	}
+	defer src.Close()
+
+	// Читаем содержимое файла
+	fileData, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось прочитать файл: " + err.Error()})
+		return
+	}
+
+	// Импортируем жанры
+	count, err := h.service.GenreServ.ImportGenresFromCSV(fileData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при импорте жанров: " + err.Error()})
+		return
+	}
+
+	// Логируем действие
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		log.Printf("Error getting cookie for logging: %v", err)
+	} else {
+		err = h.service.LogServ.CreateLogWithCookie(cookie, "Импорт жанров из CSV")
+		if err != nil {
+			log.Printf("Error creating log: %v", err)
+		}
+	}
+
+	c.JSON(
+		http.StatusOK, gin.H{
+			"message": fmt.Sprintf("Успешно импортировано %d жанров", count),
+			"count":   count,
+		},
+	)
 }

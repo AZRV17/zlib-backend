@@ -1,7 +1,12 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -9,10 +14,14 @@ import (
 
 type UserService struct {
 	repository repository.UserRepo
+	emailServ  *EmailService
 }
 
-func NewUserService(repo repository.UserRepo) *UserService {
-	return &UserService{repository: repo}
+func NewUserService(repo repository.UserRepo, emailService *EmailService) *UserService {
+	return &UserService{
+		repository: repo,
+		emailServ:  emailService,
+	}
 }
 
 func (u UserService) SignInByLogin(login, password string) (*domain.User, error) {
@@ -94,6 +103,8 @@ func (u UserService) UpdateUser(userInput *UpdateUserInput) error {
 		PassportNumber: userInput.PassportNumber,
 	}
 
+	log.Println(userInput)
+
 	if err := u.repository.UpdateUser(user); err != nil {
 		return err
 	}
@@ -129,4 +140,79 @@ func (u UserService) hashPassword(password string) (string, error) {
 func (u UserService) comparePasswords(hashedPassword, password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
+}
+
+// RequestPasswordReset запрашивает сброс пароля и отправляет ссылку на email
+func (u UserService) RequestPasswordReset(email string) error {
+	user, err := u.repository.GetUserByEmail(email)
+	if err != nil {
+		return fmt.Errorf("пользователь с таким email не найден")
+	}
+
+	// Генерируем случайный токен
+	token, err := u.generateResetToken()
+	if err != nil {
+		return err
+	}
+
+	// Устанавливаем срок действия токена (24 часа)
+	tokenExpiry := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+
+	// Сохраняем токен в базу данных
+	if err := u.repository.SetResetPasswordToken(user.ID, token, tokenExpiry); err != nil {
+		return err
+	}
+
+	// Отправляем email с ссылкой для сброса пароля
+	if err := u.emailServ.SendPasswordResetEmail(user.Email, token); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ValidateResetToken проверяет валидность токена для сброса пароля
+func (u UserService) ValidateResetToken(token string) (*domain.User, error) {
+	user, err := u.repository.GetUserByResetToken(token)
+	if err != nil {
+		return nil, fmt.Errorf("неверный токен сброса пароля")
+	}
+
+	// Проверяем, не истек ли срок действия токена
+	if user.ResetTokenExpiry.Before(time.Now()) {
+		return nil, fmt.Errorf("срок действия токена истек")
+	}
+
+	return user, nil
+}
+
+// ResetPassword сбрасывает пароль пользователя
+func (u UserService) ResetPassword(token, newPassword string) error {
+	user, err := u.ValidateResetToken(token)
+	if err != nil {
+		return err
+	}
+
+	// Хешируем новый пароль
+	hashedPass, err := u.hashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	// Обновляем пароль пользователя
+	if err := u.repository.UpdatePassword(user.ID, hashedPass); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generateResetToken генерирует случайный токен для сброса пароля
+func (u UserService) generateResetToken() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }

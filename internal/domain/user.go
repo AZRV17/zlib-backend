@@ -31,19 +31,20 @@ func (r Role) Value() (driver.Value, error) {
 }
 
 type User struct {
-	ID             uint           `json:"id" gorm:"primaryKey,autoIncrement"`
-	Login          string         `json:"login" gore:"unique"`
-	FullName       string         `json:"full_name"`
-	Password       string         `json:"password"`
-	Role           Role           `json:"role" gorm:"type:role;default:'user'"`
-	Email          string         `json:"email" gorm:"unique"`
-	PhoneNumber    string         `json:"phone_number" gorm:"unique"`
-	PassportNumber int            `json:"passport_number" gorm:"unique"`
-	Favorites      []Favorite     `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	Reservations   []Reservation  `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	Reviews        []Review       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	Notifications  []Notification `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	Logs           []Log          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	CreatedAt      time.Time      `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt      time.Time      `json:"updatedAt" gorm:"autoUpdateTime"`
+	ID                 uint          `json:"id" gorm:"primaryKey,autoIncrement"`
+	Login              string        `json:"login" gore:"unique"`
+	FullName           string        `json:"full_name"`
+	Password           string        `json:"password"`
+	Role               Role          `json:"role" gorm:"type:role;default:'user'"`
+	Email              string        `json:"email" gorm:"unique"`
+	PhoneNumber        string        `json:"phone_number" gorm:"unique"`
+	PassportNumber     int           `json:"passport_number" gorm:"unique"`
+	Favorites          []Favorite    `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Reservations       []Reservation `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Reviews            []Review      `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Logs               []Log         `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	ResetPasswordToken string        `json:"-" gorm:"type:varchar(100)"`
+	ResetTokenExpiry   time.Time     `json:"-"`
+	CreatedAt          time.Time     `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt          time.Time     `json:"updatedAt" gorm:"autoUpdateTime"`
 }

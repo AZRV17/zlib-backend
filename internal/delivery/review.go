@@ -1,10 +1,11 @@
 package delivery
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initReviewRoutes(r *gin.Engine) {

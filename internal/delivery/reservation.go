@@ -1,7 +1,9 @@
 package delivery
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -14,6 +16,7 @@ func (h *Handler) initReservationRoutes(r *gin.Engine) {
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/", h.getAllReservations)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).PATCH("/:id", h.updateReservationStatus)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id", h.updateReservationStatus)
+		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/export", h.exportReservationsToCSV)
 	}
 }
 
@@ -107,4 +110,37 @@ func (h *Handler) updateReservationStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "reservation updated"})
+}
+
+func (h *Handler) exportReservationsToCSV(c *gin.Context) {
+	reservationData, err := h.service.ReservationServ.ExportReservationsToCSV()
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filename := "books.csv"
+
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Expires", "0")
+	c.Header("Cache-Control", "must-revalidate")
+	c.Header("Pragma", "public")
+	c.Header("Content-Length", fmt.Sprint(len(reservationData)))
+
+	c.Data(http.StatusOK, "text/csv", reservationData)
+
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		log.Printf("Error getting cookie for logging: %v", err)
+		return
+	}
+
+	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт бронирований в CSV")
+	if err != nil {
+		log.Printf("Error creating log: %v", err)
+	}
 }

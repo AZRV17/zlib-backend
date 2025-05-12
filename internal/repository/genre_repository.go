@@ -114,7 +114,7 @@ func (g GenreRepository) ExportGenresToCSV() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
 
-	headers := []string{"ID", "Название"}
+	headers := []string{"ID", "Название", "Описание"}
 	if err := writer.Write(headers); err != nil {
 		return nil, err
 	}
@@ -123,6 +123,7 @@ func (g GenreRepository) ExportGenresToCSV() ([]byte, error) {
 		row := []string{
 			strconv.FormatUint(uint64(genre.ID), 10),
 			genre.Name,
+			genre.Description,
 		}
 
 		if err := writer.Write(row); err != nil {

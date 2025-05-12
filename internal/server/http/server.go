@@ -3,8 +3,6 @@ package httpserver
 import (
 	"context"
 	"github.com/AZRV17/zlib-backend/internal/config"
-	"github.com/AZRV17/zlib-backend/internal/server/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -18,11 +16,11 @@ type HTTPServer struct {
 }
 
 func NewHTTPServer(cfg *config.Config, handler http.Handler) *HTTPServer {
-	metricsHandler := middleware.MetricsMiddleware(handler)
+	//metricsHandler := middleware.MetricsMiddleware(handler)
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/", metricsHandler)
+	//mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", handler)
 
 	return &HTTPServer{
 		httpServer: &http.Server{

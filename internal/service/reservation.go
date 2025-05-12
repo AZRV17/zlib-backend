@@ -103,3 +103,7 @@ func (r ReservationService) makeUniqueCodeAvailable(codeID uint) error {
 
 	return nil
 }
+
+func (r ReservationService) ExportReservationsToCSV() ([]byte, error) {
+	return r.repository.ExportReservationsToCSV()
+}

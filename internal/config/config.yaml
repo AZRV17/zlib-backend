@@ -13,7 +13,7 @@ auth:
   secret-key: secret
 
 email:
-  password: ruqs4XdcvhndKnrEjkDi
-  username: skylang@inbox.ru
+  password: kDnmJvpth8di5pBcWxtD
+  user: zlib_sup@inbox.ru
   host: smtp.mail.ru
   port: 465

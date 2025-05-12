@@ -1,17 +1,22 @@
 package service
 
 import (
+	"bytes"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 type BookService struct {
@@ -219,6 +224,24 @@ func (b *BookService) FindBookByTitle(limit int, offset int, title string) ([]*d
 	return b.bookRepo.FindBookByTitle(limit, offset, title)
 }
 
+func (b *BookService) FindBooks(limit int, offset int, query string) ([]*domain.Book, error) {
+	books, err := b.bookRepo.FindBooks(limit, offset, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Добавляем префикс к путям изображений, если они есть и не начинаются с http
+	for _, book := range books {
+		if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+			continue
+		}
+
+		book.Picture = "http://localhost:8080/" + book.Picture
+	}
+
+	return books, nil
+}
+
 func (b BookService) GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error) {
 	return b.bookRepo.GetAudiobookFilesByBookID(bookID)
 }
@@ -294,4 +317,155 @@ func (b BookService) UpdateAudiobookFileOrder(fileID uint, order int) error {
 	file.Order = order
 
 	return b.bookRepo.UpdateAudiobookFile(file)
+}
+
+func (b BookService) ExportBooksToCSV() ([]byte, error) {
+	return b.bookRepo.ExportBooksToCSV()
+}
+
+func (b BookService) ImportBooksFromCSV(data []byte) (int, error) {
+	reader := csv.NewReader(bytes.NewReader(data))
+	// Пропускаем заголовки
+	if _, err := reader.Read(); err != nil {
+		return 0, fmt.Errorf("ошибка при чтении заголовков CSV: %w", err)
+	}
+
+	importedCount := 0
+	tx := b.db.Begin()
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			tx.Rollback()
+			return importedCount, fmt.Errorf("ошибка при чтении записи CSV: %w", err)
+		}
+
+		// Проверяем, что у нас достаточно полей
+		if len(record) < 6 {
+			continue // Пропускаем некорректные записи
+		}
+
+		// Обработка полей CSV
+		// [Title, AuthorName AuthorLastname, GenreName, PublisherName, YearOfPublication, ISBN]
+		title := strings.TrimSpace(record[0])
+		authorFullName := strings.TrimSpace(record[1])
+		genreName := strings.TrimSpace(record[2])
+		publisherName := strings.TrimSpace(record[3])
+		yearStr := strings.TrimSpace(record[4])
+		isbnStr := strings.TrimSpace(record[5])
+		description := ""
+		if len(record) > 6 {
+			description = strings.TrimSpace(record[6])
+		}
+
+		// Разбиваем имя автора на имя и фамилию
+		authorParts := strings.Split(authorFullName, " ")
+		authorName := ""
+		authorLastname := ""
+		if len(authorParts) > 0 {
+			authorName = authorParts[0]
+			if len(authorParts) > 1 {
+				authorLastname = strings.Join(authorParts[1:], " ")
+			}
+		}
+
+		// Ищем или создаем автора
+		var author domain.Author
+		result := tx.Where("name = ? AND lastname = ?", authorName, authorLastname).First(&author)
+		if result.Error != nil {
+			// Автор не найден, создаем нового
+			author = domain.Author{
+				Name:     authorName,
+				Lastname: authorLastname,
+			}
+			if err := tx.Create(&author).Error; err != nil {
+				tx.Rollback()
+				return importedCount, fmt.Errorf("ошибка при создании автора: %w", err)
+			}
+		}
+
+		// Ищем или создаем жанр
+		var genre domain.Genre
+		result = tx.Where("name = ?", genreName).First(&genre)
+		if result.Error != nil {
+			// Жанр не найден, создаем новый
+			genre = domain.Genre{
+				Name: genreName,
+			}
+			if err := tx.Create(&genre).Error; err != nil {
+				tx.Rollback()
+				return importedCount, fmt.Errorf("ошибка при создании жанра: %w", err)
+			}
+		}
+
+		// Ищем или создаем издателя
+		var publisher domain.Publisher
+		result = tx.Where("name = ?", publisherName).First(&publisher)
+		if result.Error != nil {
+			// Издатель не найден, создаем нового
+			publisher = domain.Publisher{
+				Name: publisherName,
+			}
+			if err := tx.Create(&publisher).Error; err != nil {
+				tx.Rollback()
+				return importedCount, fmt.Errorf("ошибка при создании издателя: %w", err)
+			}
+		}
+
+		// Парсим ISBN
+		isbn := 0
+		if isbnStr != "" {
+			var err error
+			isbn, err = strconv.Atoi(isbnStr)
+			if err != nil {
+				// Если не удалось распарсить ISBN, просто пропускаем его
+				isbn = 0
+			}
+		}
+
+		// Парсим год публикации
+		yearOfPublication, err := time.Parse("2006-01-02", yearStr)
+		if err != nil {
+			// Если не удалось распарсить дату, используем текущую
+			yearOfPublication = time.Now()
+		}
+
+		// Создаем книгу
+		book := domain.Book{
+			Title:             title,
+			Description:       description,
+			AuthorID:          author.ID,
+			GenreID:           genre.ID,
+			PublisherID:       publisher.ID,
+			ISBN:              isbn,
+			YearOfPublication: yearOfPublication,
+			Rating:            0, // Начальный рейтинг
+		}
+
+		// Проверяем, существует ли уже книга с таким названием и автором
+		var existingBook domain.Book
+		result = tx.Where("title = ? AND author_id = ?", title, author.ID).First(&existingBook)
+		if result.Error == nil {
+			// Книга уже существует, пропускаем
+			continue
+		}
+
+		// Создаем книгу
+		if err := tx.Create(&book).Error; err != nil {
+			tx.Rollback()
+			return importedCount, fmt.Errorf("ошибка при создании книги: %w", err)
+		}
+
+		importedCount++
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return 0, fmt.Errorf("ошибка при фиксации транзакции: %w", err)
+	}
+
+	return importedCount, nil
 }

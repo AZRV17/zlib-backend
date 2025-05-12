@@ -1,8 +1,12 @@
 package repository
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
+	"strconv"
 )
 
 type PublisherRepository struct {
@@ -100,4 +104,39 @@ func (p PublisherRepository) DeletePublisher(id uint) error {
 	}
 
 	return nil
+}
+
+func (p PublisherRepository) ExportPublishersToCSV() ([]byte, error) {
+	publishers, err := p.GetPublishers()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	writer := csv.NewWriter(buf)
+
+	headers := []string{"ID", "Название"}
+
+	if err := writer.Write(headers); err != nil {
+		return nil, err
+	}
+
+	for _, publisher := range publishers {
+		row := []string{
+			strconv.FormatUint(uint64(publisher.ID), 10),
+			publisher.Name,
+		}
+
+		if err := writer.Write(row); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }

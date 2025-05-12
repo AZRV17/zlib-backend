@@ -1,11 +1,13 @@
 package service
 
 import (
+	"net/http"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/config"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 	"gorm.io/gorm"
-	"net/http"
-	"time"
 )
 
 type CreateAuthorInput struct {
@@ -33,6 +35,7 @@ type AuthorServ interface {
 	CreateAuthorBook(authorBookInput *domain.AuthorBook) error
 	DeleteAuthorBook(id uint) error
 	ExportAuthorsToCSV() ([]byte, error)
+	ImportAuthorsFromCSV(data []byte) (int, error)
 }
 
 type CreateBookInput struct {
@@ -87,6 +90,9 @@ type BookServ interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
+	FindBooks(limit int, offset int, query string) ([]*domain.Book, error) // Новый метод для расширенного поиска
+	ExportBooksToCSV() ([]byte, error)
+	ImportBooksFromCSV(data []byte) (int, error)
 
 	// методы для аудиокниг
 	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
@@ -128,6 +134,8 @@ type GenreServ interface {
 	CreateGenre(genreInput *CreateGenreInput) error
 	UpdateGenre(genreInput *UpdateGenreInput) error
 	DeleteGenre(id uint) error
+	ExportGenresToCSV() ([]byte, error)
+	ImportGenresFromCSV(data []byte) (int, error)
 }
 
 type CreateLogInput struct {
@@ -155,18 +163,6 @@ type LogServ interface {
 	CreateLogWithCookie(cookie *http.Cookie, action string) error
 }
 
-type CreateNotificationInput struct {
-	UserID  uint   `json:"user_id"`
-	Message string `json:"message"`
-}
-
-type NotificationServ interface {
-	GetNotificationByID(id uint) (*domain.Notification, error)
-	GetNotifications() ([]*domain.Notification, error)
-	CreateNotification(notificationInput *CreateNotificationInput) error
-	DeleteNotification(id uint) error
-}
-
 type CreatePublisherInput struct {
 	Name string `json:"name"`
 }
@@ -182,6 +178,8 @@ type PublisherServ interface {
 	CreatePublisher(publisherInput *CreatePublisherInput) error
 	UpdatePublisher(publisherInput *UpdatePublisherInput) error
 	DeletePublisher(id uint) error
+	ExportPublishersToCSV() ([]byte, error)
+	ImportPublishersFromCSV(data []byte) (int, error)
 }
 
 type CreateReservationInput struct {
@@ -209,6 +207,7 @@ type ReservationServ interface {
 	DeleteReservation(id uint) error
 	GetReservationsByUserID(id uint) ([]*domain.Reservation, error)
 	UpdateReservationStatus(id uint, status string) error
+	ExportReservationsToCSV() ([]byte, error)
 }
 
 type CreateReviewInput struct {
@@ -268,6 +267,9 @@ type UserServ interface {
 	GetUserByEmail(email string) (*domain.User, error)
 	UpdateUserRole(id uint, role domain.Role) error
 	DeleteUser(id uint) error
+	RequestPasswordReset(email string) error
+	ValidateResetToken(token string) (*domain.User, error)
+	ResetPassword(token, newPassword string) error
 	hashPassword(password string) (string, error)
 	comparePasswords(hashedPassword, password string) bool
 }
@@ -292,7 +294,6 @@ type Service struct {
 	FavoriteServ
 	GenreServ
 	LogServ
-	NotificationServ
 	PublisherServ
 	ReservationServ
 	ReviewServ
@@ -300,19 +301,36 @@ type Service struct {
 	ChatServ
 }
 
-func NewService(repo *repository.Repository, db *gorm.DB) *Service {
+func NewService(repo *repository.Repository, db *gorm.DB, cfg *config.Config) *Service {
+	emailConfig := EmailConfig{
+		Host:     cfg.Email.Host,
+		Port:     cfg.Email.Port,
+		Username: cfg.Email.User,
+		Password: cfg.Email.Password,
+	}
+
+	emailService := NewEmailService(emailConfig)
+	authorServ := NewAuthorService(repo)
+	bookServ := NewBookService(repo.BookRepo, repo.ReservationRepo, db)
+	favoriteServ := NewFavoriteService(repo)
+	genreServ := NewGenreService(repo)
+	logServ := NewLogService(repo)
+	publisherServ := NewPublisherService(repo)
+	reservationServ := NewReservationService(repo, repo.BookRepo)
+	reviewServ := NewReviewService(repo, repo.BookRepo)
+	userServ := NewUserService(repo, emailService)
+	chatServ := NewChatService(repo)
 	return &Service{
-		repo:             repo,
-		AuthorServ:       NewAuthorService(repo.AuthorRepo),
-		BookServ:         NewBookService(repo.BookRepo, repo.ReservationRepo, db),
-		FavoriteServ:     NewFavoriteService(repo.FavoriteRepo),
-		GenreServ:        NewGenreService(repo.GenreRepo),
-		LogServ:          NewLogService(repo.LogRepo),
-		NotificationServ: NewNotificationService(repo.NotificationRepo),
-		PublisherServ:    NewPublisherService(repo.PublisherRepo),
-		ReservationServ:  NewReservationService(repo.ReservationRepo, repo.BookRepo),
-		ReviewServ:       NewReviewService(repo.ReviewRepo),
-		UserServ:         NewUserService(repo.UserRepo),
-		ChatServ:         NewChatService(repo.ChatRepo),
+		repo:            repo,
+		AuthorServ:      authorServ,
+		BookServ:        bookServ,
+		FavoriteServ:    favoriteServ,
+		GenreServ:       genreServ,
+		LogServ:         logServ,
+		PublisherServ:   publisherServ,
+		ReservationServ: reservationServ,
+		ReviewServ:      reviewServ,
+		UserServ:        userServ,
+		ChatServ:        chatServ,
 	}
 }

@@ -1,6 +1,9 @@
 package service
 
 import (
+	"errors"
+	"log"
+
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
 )
@@ -10,8 +13,8 @@ type ReviewService struct {
 	bookRepository repository.BookRepo
 }
 
-func NewReviewService(repo repository.ReviewRepo) *ReviewService {
-	return &ReviewService{repository: repo}
+func NewReviewService(repo repository.ReviewRepo, bookRepo repository.BookRepo) *ReviewService {
+	return &ReviewService{repository: repo, bookRepository: bookRepo}
 }
 
 func (r ReviewService) GetReviewByID(id uint) (*domain.Review, error) {
@@ -23,6 +26,17 @@ func (r ReviewService) GetReviews() ([]*domain.Review, error) {
 }
 
 func (r ReviewService) CreateReview(reviewInput *CreateReviewInput) error {
+	log.Println(reviewInput)
+
+	// Проверка существования отзыва от пользователя на эту книгу
+	exists, err := r.repository.CheckUserReviewExists(reviewInput.UserID, reviewInput.BookID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errors.New("user already reviewed this book")
+	}
+
 	review := &domain.Review{
 		UserID:  reviewInput.UserID,
 		BookID:  reviewInput.BookID,
@@ -30,7 +44,7 @@ func (r ReviewService) CreateReview(reviewInput *CreateReviewInput) error {
 		Message: reviewInput.Message,
 	}
 
-	err := r.updateBookRating(review.BookID, review.Rating)
+	err = r.updateBookRating(review.BookID, review.Rating)
 	if err != nil {
 		return err
 	}

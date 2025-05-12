@@ -38,6 +38,8 @@ type BookRepo interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
+	FindBooks(limit int, offset int, query string) ([]*domain.Book, error) // Новый метод
+	ExportBooksToCSV() ([]byte, error)
 
 	// Методы для работы с аудиофайлами книги
 	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
@@ -62,6 +64,7 @@ type GenreRepo interface {
 	CreateGenre(genre *domain.Genre) error
 	UpdateGenre(genre *domain.Genre) error
 	DeleteGenre(id uint) error
+	ExportGenresToCSV() ([]byte, error)
 }
 
 type LogRepo interface {
@@ -73,20 +76,13 @@ type LogRepo interface {
 	GetLogsByUserID(id uint) ([]*domain.Log, error)
 }
 
-type NotificationRepo interface {
-	GetNotificationByID(id uint) (*domain.Notification, error)
-	GetNotifications() ([]*domain.Notification, error)
-	CreateNotification(notification *domain.Notification) error
-	DeleteNotification(id uint) error
-	GetNotificationsByUserID(id uint) ([]*domain.Notification, error)
-}
-
 type PublisherRepo interface {
 	GetPublisherByID(id uint) (*domain.Publisher, error)
 	GetPublishers() ([]*domain.Publisher, error)
 	CreatePublisher(publisher *domain.Publisher) error
 	UpdatePublisher(publisher *domain.Publisher) error
 	DeletePublisher(id uint) error
+	ExportPublishersToCSV() ([]byte, error)
 }
 
 type ReservationRepo interface {
@@ -97,6 +93,7 @@ type ReservationRepo interface {
 	DeleteReservation(id uint) error
 	CreateReservationWithTransactions(reservation *domain.Reservation, tx *gorm.DB) error
 	GetUserReservations(id uint) ([]*domain.Reservation, error)
+	ExportReservationsToCSV() ([]byte, error)
 }
 
 type ReviewRepo interface {
@@ -106,6 +103,7 @@ type ReviewRepo interface {
 	UpdateReview(review *domain.Review) error
 	DeleteReview(id uint) error
 	GetReviewsByBookID(id uint) ([]*domain.Review, error)
+	CheckUserReviewExists(userID uint, bookID uint) (bool, error)
 }
 
 type UpdateUserDTOInput struct {
@@ -115,8 +113,8 @@ type UpdateUserDTOInput struct {
 	Password       string      `json:"password"`
 	Role           domain.Role `json:"role" gorm:"type:role;default:'user'"`
 	Email          string      `json:"email" gorm:"unique"`
-	PhoneNumber    string      `json:"phoneNumber" gorm:"unique"`
-	PassportNumber int         `json:"passportNumber" gorm:"unique"`
+	PhoneNumber    string      `json:"phone_number" gorm:"unique"`
+	PassportNumber int         `json:"passport_number" gorm:"unique"`
 }
 
 type UserRepo interface {
@@ -130,6 +128,9 @@ type UserRepo interface {
 	GetUserByLogin(login string) (*domain.User, error)
 	GetUserByEmail(email string) (*domain.User, error)
 	UpdateUserRole(id uint, role domain.Role) error
+	SetResetPasswordToken(userID uint, token string, expiry string) error
+	GetUserByResetToken(token string) (*domain.User, error)
+	UpdatePassword(userID uint, password string) error
 }
 
 type ChatRepo interface {
@@ -153,7 +154,6 @@ type Repository struct {
 	FavoriteRepo
 	GenreRepo
 	LogRepo
-	NotificationRepo
 	PublisherRepo
 	ReservationRepo
 	ReviewRepo
@@ -163,17 +163,16 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) Repository {
 	return Repository{
-		DB:               db,
-		AuthorRepo:       NewAuthorRepository(db.Model(&domain.Author{})),
-		BookRepo:         NewBookRepository(db),
-		FavoriteRepo:     NewFavoriteRepository(db.Model(&domain.Favorite{})),
-		GenreRepo:        NewGenreRepository(db.Model(&domain.Genre{})),
-		LogRepo:          NewLogRepository(db.Model(&domain.Log{})),
-		NotificationRepo: NewNotificationRepository(db.Model(&domain.Notification{})),
-		PublisherRepo:    NewPublisherRepository(db.Model(&domain.Publisher{})),
-		ReservationRepo:  NewReservationRepository(db),
-		ReviewRepo:       NewReviewRepository(db.Model(&domain.Review{})),
-		UserRepo:         NewUserRepository(db.Model(&domain.User{})),
-		ChatRepo:         NewChatRepository(db),
+		DB:              db,
+		AuthorRepo:      NewAuthorRepository(db.Model(&domain.Author{})),
+		BookRepo:        NewBookRepository(db),
+		FavoriteRepo:    NewFavoriteRepository(db.Model(&domain.Favorite{})),
+		GenreRepo:       NewGenreRepository(db.Model(&domain.Genre{})),
+		LogRepo:         NewLogRepository(db.Model(&domain.Log{})),
+		PublisherRepo:   NewPublisherRepository(db.Model(&domain.Publisher{})),
+		ReservationRepo: NewReservationRepository(db),
+		ReviewRepo:      NewReviewRepository(db.Model(&domain.Review{})),
+		UserRepo:        NewUserRepository(db.Model(&domain.User{})),
+		ChatRepo:        NewChatRepository(db),
 	}
 }

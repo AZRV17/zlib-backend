@@ -13,6 +13,11 @@ import (
 func (h *Handler) initUserRoutes(r *gin.Engine) {
 	users := r.Group("/users")
 	{
+		// Маршруты для восстановления пароля
+		users.POST("/forgot-password", h.requestPasswordReset)
+		users.GET("/reset-password", h.validateResetToken)
+		users.POST("/reset-password", h.resetPassword)
+
 		users.POST("/sign-up", h.signUp)
 		users.POST("/sign-in-by-login", h.signInByLogin)
 		users.POST("/sign-in-by-email", h.signInByEmail)
@@ -124,6 +129,18 @@ func (h *Handler) signInByEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	http.SetCookie(
+		c.Writer, &http.Cookie{
+			Name:     "id",
+			Value:    strconv.Itoa(int(user.ID)), //nolint:gosec
+			Expires:  time.Now().Add(24 * time.Hour),
+			Path:     "/",
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
+	)
 
 	c.JSON(http.StatusOK, user)
 }
@@ -385,4 +402,69 @@ func (h *Handler) deleteUserByCookie(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+}
+
+// requestPasswordReset обрабатывает запрос на восстановление пароля
+type forgotPasswordInput struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h *Handler) requestPasswordReset(c *gin.Context) {
+	var input forgotPasswordInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.UserServ.RequestPasswordReset(input.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "На указанный email отправлена инструкция по восстановлению пароля"})
+}
+
+// validateResetToken проверяет валидность токена для сброса пароля
+func (h *Handler) validateResetToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Отсутствует токен сброса пароля"})
+		return
+	}
+
+	user, err := h.service.UserServ.ValidateResetToken(token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(
+		http.StatusOK, gin.H{
+			"message": "Токен действителен",
+			"email":   user.Email,
+		},
+	)
+}
+
+// resetPassword сбрасывает пароль пользователя
+type resetPasswordInput struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+func (h *Handler) resetPassword(c *gin.Context) {
+	var input resetPasswordInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.UserServ.ResetPassword(input.Token, input.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Пароль успешно изменен"})
 }

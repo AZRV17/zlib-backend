@@ -145,23 +145,19 @@ func (a AuthorRepository) UpdateAuthorBook(authorBook *domain.AuthorBook) error 
 }
 
 func (a AuthorRepository) ExportAuthorsToCSV() ([]byte, error) {
-	// Получаем всех авторов с их книгами
 	authors, err := a.GetAuthors()
 	if err != nil {
 		return nil, fmt.Errorf("error getting authors: %w", err)
 	}
 
-	// Создаем буфер для записи CSV
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
 
-	// Записываем заголовки
 	headers := []string{"ID", "Имя", "Фамилия", "Биография", "Дата рождения"}
 	if err := writer.Write(headers); err != nil {
 		return nil, fmt.Errorf("error writing headers: %w", err)
 	}
 
-	// Записываем данные по каждому автору
 	for _, author := range authors {
 		row := []string{
 			strconv.FormatUint(uint64(author.ID), 10),
@@ -171,7 +167,6 @@ func (a AuthorRepository) ExportAuthorsToCSV() ([]byte, error) {
 			author.Birthdate.Format("2006-01-02"),
 		}
 
-		// Добавляем количество книг
 		row = append(row, strconv.Itoa(len(author.Books)))
 
 		if err := writer.Write(row); err != nil {
@@ -179,7 +174,6 @@ func (a AuthorRepository) ExportAuthorsToCSV() ([]byte, error) {
 		}
 	}
 
-	// Записываем все оставшиеся данные из буфера writer'а
 	writer.Flush()
 
 	if err := writer.Error(); err != nil {

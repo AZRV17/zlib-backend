@@ -42,7 +42,7 @@ func Run() {
 
 	repo := repository.NewRepository(psql.DB)
 
-	service := serv.NewService(&repo, psql.DB)
+	service := serv.NewService(&repo, psql.DB, cfg)
 
 	r := gin.Default()
 

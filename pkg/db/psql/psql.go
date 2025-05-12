@@ -36,7 +36,6 @@ func Connect(dsn string) error {
 		&domain.Favorite{},
 		&domain.Review{},
 		&domain.Reservation{},
-		&domain.Notification{},
 		&domain.Log{},
 		&domain.Message{},
 		&domain.Chat{},

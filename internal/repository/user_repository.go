@@ -187,3 +187,66 @@ func (u UserRepository) UpdateUserRole(id uint, role domain.Role) error {
 
 	return nil
 }
+
+func (u UserRepository) SetResetPasswordToken(userID uint, token string, expiry string) error {
+	tx := u.DB.Begin()
+
+	if err := tx.Model(&domain.User{}).Where("id = ?", userID).
+		Updates(
+			map[string]interface{}{
+				"reset_password_token": token,
+				"reset_token_expiry":   expiry,
+			},
+		).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (u UserRepository) GetUserByResetToken(token string) (*domain.User, error) {
+	var user domain.User
+
+	tx := u.DB.Begin()
+
+	if err := tx.Where("reset_password_token = ?", token).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (u UserRepository) UpdatePassword(userID uint, password string) error {
+	tx := u.DB.Begin()
+
+	if err := tx.Model(&domain.User{}).Where("id = ?", userID).
+		Updates(
+			map[string]interface{}{
+				"password":             password,
+				"reset_password_token": "",
+				"reset_token_expiry":   nil,
+			},
+		).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

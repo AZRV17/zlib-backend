@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"strconv"
+
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
-	"strconv"
 )
 
 type BookRepository struct {
@@ -442,4 +443,50 @@ func (b BookRepository) DeleteAudiobookFile(id uint) error {
 	}
 
 	return tx.Commit().Error
+}
+
+func (b BookRepository) FindBooks(limit int, offset int, query string) ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	tx := b.DB.Begin()
+
+	// Попробуем преобразовать запрос в число для поиска по ISBN
+	var isbn int
+	if _, err := fmt.Sscanf(query, "%d", &isbn); err == nil {
+		// Если запрос - число, то ищем по ISBN
+		if err := tx.Model(&domain.Book{}).Where(
+			"isbn = ?", isbn,
+		).Preload("Author").Preload("Genre").Preload("Publisher").
+			Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
+		// Если нашли книги по ISBN, возвращаем их
+		if len(books) > 0 {
+			tx.Commit()
+			return books, nil
+		}
+	}
+
+	// Ищем книги по названию и по авторам (имя или фамилия содержит запрос)
+	if err := tx.Model(&domain.Book{}).
+		Joins("JOIN authors ON books.author_id = authors.id").
+		Where(
+			"lower(books.title) LIKE lower(?) OR lower(authors.name) LIKE lower(?) OR lower(authors.lastname) LIKE lower(?)",
+			"%"+query+"%", "%"+query+"%", "%"+query+"%",
+		).
+		Preload("Author").Preload("Genre").Preload("Publisher").
+		Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return books, nil
 }

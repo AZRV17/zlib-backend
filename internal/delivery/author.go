@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,6 +21,7 @@ func (h *Handler) initAuthorRoutes(r *gin.Engine) {
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).PUT("/:id", h.updateAuthor)
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).DELETE("/:id", h.deleteAuthor)
 		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/export", h.exportAuthorsToCSV)
+		authors.Use(h.AuthMiddleware, h.LibrarianMiddleware).POST("/import", h.importAuthorsFromCSV)
 	}
 }
 
@@ -193,4 +196,59 @@ func (h *Handler) exportAuthorsToCSV(c *gin.Context) {
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}
+}
+
+func (h *Handler) importAuthorsFromCSV(c *gin.Context) {
+	// Получаем файл из запроса
+	file, err := c.FormFile("csv")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "не удалось получить CSV файл: " + err.Error()})
+		return
+	}
+
+	// Проверяем расширение файла
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".csv") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "файл должен быть в формате CSV"})
+		return
+	}
+
+	// Открываем файл
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось открыть файл: " + err.Error()})
+		return
+	}
+	defer src.Close()
+
+	// Читаем содержимое файла
+	fileData, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось прочитать файл: " + err.Error()})
+		return
+	}
+
+	// Импортируем авторов
+	count, err := h.service.AuthorServ.ImportAuthorsFromCSV(fileData)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при импорте авторов: " + err.Error()})
+		return
+	}
+
+	// Логируем действие
+	cookie, err := c.Request.Cookie("id")
+	if err != nil {
+		log.Printf("Error getting cookie for logging: %v", err)
+	} else {
+		err = h.service.LogServ.CreateLogWithCookie(cookie, "Импорт авторов из CSV")
+		if err != nil {
+			log.Printf("Error creating log: %v", err)
+		}
+	}
+
+	c.JSON(
+		http.StatusOK, gin.H{
+			"message": fmt.Sprintf("Успешно импортировано %d авторов", count),
+			"count":   count,
+		},
+	)
 }

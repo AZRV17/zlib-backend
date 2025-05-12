@@ -120,3 +120,22 @@ func (r ReviewRepository) GetReviewsByBookID(id uint) ([]*domain.Review, error) 
 
 	return reviews, nil
 }
+
+func (r ReviewRepository) CheckUserReviewExists(userID uint, bookID uint) (bool, error) {
+	var count int64
+
+	tx := r.DB.Begin()
+
+	if err := tx.Model(&domain.Review{}).Where("user_id = ? AND book_id = ?", userID, bookID).Count(&count).Error; err != nil {
+		tx.Rollback()
+		return false, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return false, err
+	}
+
+	return count > 0, nil
+}
