@@ -170,31 +170,56 @@ func (h *Handler) logout(c *gin.Context) {
 
 // Вспомогательная функция для установки JWT токенов в куки
 func setAuthCookies(c *gin.Context, tokens *auth.Tokens) {
-	c.SetCookie(
-		"access_token",
-		tokens.AccessToken,
-		int(time.Hour.Seconds()*24),
-		"/",
-		"",
-		true,
-		true,
+	http.SetCookie(
+		c.Writer, &http.Cookie{
+			Name:     "access_token",
+			Value:    tokens.AccessToken,
+			Expires:  time.Now().Add(24 * time.Hour * 30),
+			Path:     "/",
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
 	)
 
-	c.SetCookie(
-		"refresh_token",
-		tokens.RefreshToken,
-		int(time.Hour.Seconds()*24*30), // 30 дней
-		"/",
-		"",
-		true,
-		true,
+	http.SetCookie(
+		c.Writer, &http.Cookie{
+			Name:     "refresh_token",
+			Value:    tokens.RefreshToken,
+			Expires:  time.Now().Add(24 * time.Hour * 30),
+			Path:     "/",
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
 	)
 }
 
 // Вспомогательная функция для удаления JWT токенов из куков
 func clearAuthCookies(c *gin.Context) {
-	c.SetCookie("access_token", "", -1, "/", "", true, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	http.SetCookie(
+		c.Writer, &http.Cookie{
+			Name:     "access_token",
+			Value:    "0",
+			Path:     "/",
+			MaxAge:   -1,
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
+	)
+
+	http.SetCookie(
+		c.Writer, &http.Cookie{
+			Name:     "refresh_token",
+			Value:    "0",
+			Path:     "/",
+			MaxAge:   -1,
+			Secure:   false,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		},
+	)
 }
 
 type signUpInput struct {
