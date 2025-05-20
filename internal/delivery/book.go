@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,6 +24,7 @@ func (h *Handler) initBookRoutes(r *gin.Engine) {
 		books.GET("/:id", h.getBookByID)
 		books.GET("/grouped", h.getGroupedBooksByTitle)
 		books.GET("/pagination", h.getBooksWithPagination)
+		books.GET("/top", h.getTopBooksByReservations)
 		books.GET("/:id/audio", h.getBookAudiobookFiles)
 		books.GET("/audio/:id", h.serveAudioFile)
 		books.Use(h.AuthMiddleware).GET("/:id/codes", h.getBookUniqueCodes)
@@ -149,13 +149,20 @@ func (h *Handler) createBook(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание книги")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Создание книги",
+		Date:    time.Now(),
+		Details: "Создание книги: " + input.Title,
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -298,13 +305,20 @@ func (h *Handler) updateBook(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.LogServ.CreateLogWithCookie(cookie, "Изменение книги"); err != nil {
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение книги",
+		Date:    time.Now(),
+		Details: "Изменение книги: " + book.Title,
+	}
+
+	if err := h.service.LogServ.CreateLog(createLogInput); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -325,13 +339,20 @@ func (h *Handler) deleteBook(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление книги")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Удаление книги",
+		Date:    time.Now(),
+		Details: fmt.Sprintf("Удаление книги с ID: %d", bookID),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -341,15 +362,9 @@ func (h *Handler) deleteBook(c *gin.Context) {
 }
 
 func (h *Handler) reserveBook(c *gin.Context) {
-	userIDCookie, err := c.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	userID, err := strconv.Atoi(userIDCookie)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -359,19 +374,20 @@ func (h *Handler) reserveBook(c *gin.Context) {
 		return
 	}
 
-	code, err := h.service.BookServ.ReserveBook(uint(bookID), uint(userID)) //nolint:gosec
+	code, err := h.service.BookServ.ReserveBook(uint(bookID), userID) //nolint:gosec
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Бронирование книги",
+		Date:    time.Now(),
+		Details: fmt.Sprintf("Бронирование книги ID: %d", bookID),
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Бронирование книги")
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -388,13 +404,107 @@ type PaginatedResponse struct {
 
 func (h *Handler) getBooksWithPagination(c *gin.Context) {
 	page, err := strconv.Atoi(c.Query("page"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page number"})
 		return
 	}
 
-	limit := 10
+	limit := 8
 	offset := (page - 1) * limit
+
+	// Получаем все параметры фильтрации
+	query := c.Query("query")
+	authorIDStr := c.Query("author_id")
+	genreIDStr := c.Query("genre_id")
+	yearStartStr := c.Query("year_start")
+	yearEndStr := c.Query("year_end")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
+
+	var authorID, genreID uint
+	var yearStart, yearEnd time.Time
+
+	if authorIDStr != "" {
+		id, err := strconv.ParseUint(authorIDStr, 10, 32)
+		if err == nil {
+			authorID = uint(id)
+		}
+	}
+
+	if genreIDStr != "" {
+		id, err := strconv.ParseUint(genreIDStr, 10, 32)
+		if err == nil {
+			genreID = uint(id)
+		}
+	}
+
+	if yearStartStr != "" {
+		yearInt, err := strconv.Atoi(yearStartStr)
+		if err == nil {
+			yearStart = time.Date(yearInt, 1, 1, 0, 0, 0, 0, time.UTC)
+		}
+	}
+
+	if yearEndStr != "" {
+		yearInt, err := strconv.Atoi(yearEndStr)
+		if err == nil {
+			yearEnd = time.Date(yearInt, 12, 31, 23, 59, 59, 999999999, time.UTC)
+		}
+	}
+
+	if sortBy != "" && sortBy != "title" && sortBy != "rating" && sortBy != "year" {
+		sortBy = "title"
+	}
+
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "asc"
+	}
+
+	if query != "" || authorID > 0 || genreID > 0 || !yearStart.IsZero() || !yearEnd.IsZero() || sortBy != "" {
+		totalCount, err := h.service.BookServ.CountBooksWithFilters(query, authorID, genreID, yearStart, yearEnd)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		totalPages := (totalCount + limit - 1) / limit // Округление вверх
+
+		if totalCount > 0 && page > totalPages {
+			c.JSON(
+				http.StatusOK, PaginatedResponse{
+					Books:       []*domain.Book{},
+					TotalPages:  totalPages,
+					CurrentPage: page,
+				},
+			)
+			return
+		}
+
+		books, err := h.service.BookServ.FindBooksWithFilters(
+			limit,
+			offset,
+			query,
+			authorID,
+			genreID,
+			yearStart,
+			yearEnd,
+			sortBy,
+			sortOrder,
+		)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		response := PaginatedResponse{
+			Books:       books,
+			TotalPages:  totalPages,
+			CurrentPage: page,
+		}
+
+		c.JSON(http.StatusOK, response)
+		return
+	}
 
 	booksTotal, err := h.service.BookServ.GetBooks()
 	if err != nil {
@@ -403,41 +513,16 @@ func (h *Handler) getBooksWithPagination(c *gin.Context) {
 	}
 
 	totalCount := len(booksTotal)
-	totalPages := int(math.Ceil(float64(totalCount) / float64(limit)))
+	totalPages := (totalCount + limit - 1) / limit
 
-	query := c.Query("query")
-	if query != "" {
-		books, err := h.service.BookServ.FindBooks(limit, offset, query)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		response := PaginatedResponse{
-			Books:       books,
-			TotalPages:  totalPages,
-			CurrentPage: page,
-		}
-
-		c.JSON(http.StatusOK, response)
-		return
-	}
-
-	title := c.Query("title")
-	if title != "" {
-		books, err := h.service.BookServ.FindBookByTitle(limit, offset, title)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		response := PaginatedResponse{
-			Books:       books,
-			TotalPages:  totalPages,
-			CurrentPage: page,
-		}
-
-		c.JSON(http.StatusOK, response)
+	if page > totalPages {
+		c.JSON(
+			http.StatusOK, PaginatedResponse{
+				Books:       []*domain.Book{},
+				TotalPages:  totalPages,
+				CurrentPage: page,
+			},
+		)
 		return
 	}
 
@@ -700,13 +785,20 @@ func (h *Handler) exportBooksToCSV(c *gin.Context) {
 
 	c.Data(http.StatusOK, "text/csv", bookData)
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт книг в CSV")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Экспорт книг в CSV",
+		Date:    time.Now(),
+		Details: "Экспорт книг в CSV файл",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}
@@ -749,11 +841,18 @@ func (h *Handler) importBooksFromCSV(c *gin.Context) {
 	}
 
 	// Логируем действие
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 	} else {
-		err = h.service.LogServ.CreateLogWithCookie(cookie, "Импорт книг из CSV")
+		createLogInput := &service.CreateLogInput{
+			UserID:  userID,
+			Action:  "Импорт книг из CSV",
+			Date:    time.Now(),
+			Details: fmt.Sprintf("Успешно импортировано %d книг", count),
+		}
+
+		err = h.service.LogServ.CreateLog(createLogInput)
 		if err != nil {
 			log.Printf("Error creating log: %v", err)
 		}
@@ -765,4 +864,32 @@ func (h *Handler) importBooksFromCSV(c *gin.Context) {
 			"count":   count,
 		},
 	)
+}
+
+func (h *Handler) getTopBooksByReservations(c *gin.Context) {
+	limit := 3
+	periodMonths := 3
+
+	limitParam := c.Query("limit")
+	periodParam := c.Query("period")
+
+	if limitParam != "" {
+		if parsedLimit, err := strconv.Atoi(limitParam); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	if periodParam != "" {
+		if parsedPeriod, err := strconv.Atoi(periodParam); err == nil && parsedPeriod > 0 {
+			periodMonths = parsedPeriod
+		}
+	}
+
+	books, err := h.service.BookServ.GetTopBooksByReservations(limit, periodMonths)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, books)
 }

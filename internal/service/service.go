@@ -7,6 +7,7 @@ import (
 	"github.com/AZRV17/zlib-backend/internal/config"
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"github.com/AZRV17/zlib-backend/pkg/auth"
 	"gorm.io/gorm"
 )
 
@@ -90,9 +91,26 @@ type BookServ interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
-	FindBooks(limit int, offset int, query string) ([]*domain.Book, error) // Новый метод для расширенного поиска
+	FindBooks(limit int, offset int, query string) ([]*domain.Book, error)
 	ExportBooksToCSV() ([]byte, error)
 	ImportBooksFromCSV(data []byte) (int, error)
+	CountBooksWithFilters(
+		query string,
+		authorID uint,
+		genreID uint,
+		yearStart, yearEnd time.Time,
+	) (int, error)
+	FindBooksWithFilters(
+		limit int,
+		offset int,
+		query string,
+		authorID uint,
+		genreID uint,
+		yearStart, yearEnd time.Time,
+		sortBy string,
+		sortOrder string,
+	) ([]*domain.Book, error)
+	GetTopBooksByReservations(limit int, periodMonths int) ([]*domain.Book, error)
 
 	// методы для аудиокниг
 	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
@@ -101,6 +119,9 @@ type BookServ interface {
 	UpdateAudiobookFile(file *domain.AudiobookFile, fileData []byte) error
 	DeleteAudiobookFile(id uint) error
 	UpdateAudiobookFileOrder(file_id uint, order int) error
+
+	CountBooksMatchingSearch(query string) (int, error)
+	CountBooksMatchingTitle(title string) (int, error)
 }
 
 type CreateFavoriteInput struct {
@@ -257,8 +278,8 @@ type UpdateUserInput struct {
 }
 
 type UserServ interface {
-	SignInByLogin(login, password string) (*domain.User, error)
-	SignInByEmail(email, password string) (*domain.User, error)
+	SignInByLogin(login, password string) (*domain.User, *auth.Tokens, error)
+	SignInByEmail(email, password string) (*domain.User, *auth.Tokens, error)
 	SignUp(userInput *SignUpUserInput) error
 	GetUserByID(id uint) (*domain.User, error)
 	GetAllUsers() ([]*domain.User, error)
@@ -270,6 +291,8 @@ type UserServ interface {
 	RequestPasswordReset(email string) error
 	ValidateResetToken(token string) (*domain.User, error)
 	ResetPassword(token, newPassword string) error
+	RefreshTokens(refreshToken string) (*auth.Tokens, error)
+	ParseToken(token string) (*auth.TokenClaims, error)
 	hashPassword(password string) (string, error)
 	comparePasswords(hashedPassword, password string) bool
 }
@@ -285,6 +308,13 @@ type ChatServ interface {
 	MarkMessagesAsRead(chatID, userID uint) error
 	GetLibrarianChats(librarianID uint) ([]domain.Chat, error)
 	GetUnassignedChats() ([]domain.Chat, error)
+}
+
+type AuthServ interface {
+	SignInByLogin(login, password string) (*domain.User, *auth.Tokens, error)
+	SignInByEmail(email, password string) (*domain.User, *auth.Tokens, error)
+	RefreshTokens(refreshToken string) (*auth.Tokens, error)
+	ParseToken(token string) (*auth.TokenClaims, error)
 }
 
 type Service struct {
@@ -309,6 +339,12 @@ func NewService(repo *repository.Repository, db *gorm.DB, cfg *config.Config) *S
 		Password: cfg.Email.Password,
 	}
 
+	tokenManager := auth.NewTokenManager(
+		"your_signing_key", // Используйте значение из конфига
+		time.Hour*24,
+		time.Hour*24*30,
+	)
+
 	emailService := NewEmailService(emailConfig)
 	authorServ := NewAuthorService(repo)
 	bookServ := NewBookService(repo.BookRepo, repo.ReservationRepo, db)
@@ -318,8 +354,9 @@ func NewService(repo *repository.Repository, db *gorm.DB, cfg *config.Config) *S
 	publisherServ := NewPublisherService(repo)
 	reservationServ := NewReservationService(repo, repo.BookRepo)
 	reviewServ := NewReviewService(repo, repo.BookRepo)
-	userServ := NewUserService(repo, emailService)
+	userServ := NewUserService(repo.UserRepo, emailService, tokenManager)
 	chatServ := NewChatService(repo)
+
 	return &Service{
 		repo:            repo,
 		AuthorServ:      authorServ,

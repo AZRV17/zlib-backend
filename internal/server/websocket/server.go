@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -41,15 +40,9 @@ func NewChatHub(repo repository.ChatRepo, userSvc service.UserServ) *ChatHub {
 }
 
 func (h *ChatHub) HandleConnections(c *gin.Context) {
-	idCookie, err := c.Cookie("id")
+	userID, err := h.getUserIDFromContext(c)
 	if err != nil {
 		log.Printf("Ошибка получения cookie id: %v", err)
-		return
-	}
-
-	userID, err := strconv.ParseUint(idCookie, 10, 64)
-	if err != nil {
-		log.Printf("Ошибка парсинга ID пользователя: %v", err)
 		return
 	}
 
@@ -177,4 +170,29 @@ func (h *ChatHub) HandleMessages() {
 		}
 		h.mu.RUnlock()
 	}
+}
+
+func Unauthorized(message string) error {
+	return &AuthError{
+		Message: message,
+		Status:  http.StatusUnauthorized,
+	}
+}
+
+type AuthError struct {
+	Message string
+	Status  int
+}
+
+func (e *AuthError) Error() string {
+	return e.Message
+}
+
+func (h *ChatHub) getUserIDFromContext(c *gin.Context) (uint, error) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		return 0, Unauthorized("ID пользователя не найден в контексте")
+	}
+
+	return userID.(uint), nil
 }

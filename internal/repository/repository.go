@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
 )
@@ -38,15 +40,31 @@ type BookRepo interface {
 	GetUniqueCodeByID(id uint) (*domain.UniqueCode, error)
 	GetBooksWithPagination(limit int, offset int) ([]*domain.Book, error)
 	FindBookByTitle(limit int, offset int, title string) ([]*domain.Book, error)
-	FindBooks(limit int, offset int, query string) ([]*domain.Book, error) // Новый метод
 	ExportBooksToCSV() ([]byte, error)
-
-	// Методы для работы с аудиофайлами книги
 	GetAudiobookFilesByBookID(bookID uint) ([]*domain.AudiobookFile, error)
 	GetAudiobookFileByID(id uint) (*domain.AudiobookFile, error)
 	CreateAudiobookFile(file *domain.AudiobookFile) error
 	UpdateAudiobookFile(file *domain.AudiobookFile) error
 	DeleteAudiobookFile(id uint) error
+	FindBooks(limit int, offset int, query string) ([]*domain.Book, error)
+	CountBooksMatchingSearch(query string) (int, error)
+	FindBooksWithFilters(
+		limit int,
+		offset int,
+		query string,
+		authorID uint,
+		genreID uint,
+		yearStart, yearEnd time.Time,
+		sortBy string,
+		sortOrder string,
+	) ([]*domain.Book, error)
+	CountBooksWithFilters(
+		query string,
+		authorID uint,
+		genreID uint,
+		yearStart, yearEnd time.Time,
+	) (int, error)
+	GetTopBooksByReservations(limit int, periodMonths int) ([]*domain.Book, error)
 }
 
 type FavoriteRepo interface {

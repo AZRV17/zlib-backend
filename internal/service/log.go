@@ -1,11 +1,12 @@
 package service
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/domain"
-	"github.com/AZRV17/zlib-backend/internal/repository"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/domain"
+	"github.com/AZRV17/zlib-backend/internal/repository"
 )
 
 type LogService struct {
@@ -33,6 +34,17 @@ func (l LogService) CreateLog(logInput *CreateLogInput) error {
 	}
 
 	return l.repository.CreateLog(log)
+}
+
+// Вспомогательный метод для создания лога с простыми параметрами (для обратной совместимости)
+func (l LogService) CreateSimpleLog(userID uint, action string) error {
+	logInput := &CreateLogInput{
+		UserID:  userID,
+		Action:  action,
+		Date:    time.Now(),
+		Details: action,
+	}
+	return l.CreateLog(logInput)
 }
 
 func (l LogService) UpdateLog(logInput *UpdateLogInput) error {
@@ -65,12 +77,12 @@ func (l LogService) CreateLogWithCookie(cookie *http.Cookie, action string) erro
 		return err
 	}
 
-	log := &domain.Log{
+	logInput := &CreateLogInput{
 		UserID:  uint(userID), //nolint:gosec
 		Action:  action,
 		Date:    time.Now(),
 		Details: action,
 	}
 
-	return l.repository.CreateLog(log)
+	return l.CreateLog(logInput)
 }

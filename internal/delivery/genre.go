@@ -2,13 +2,15 @@ package delivery
 
 import (
 	"fmt"
-	"github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/gin-gonic/gin"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initGenreRoutes(r *gin.Engine) {
@@ -64,13 +66,20 @@ func (h *Handler) createGenre(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание жанра")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Создание жанра",
+		Date:    time.Now(),
+		Details: "Создание жанра: " + input.Name,
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -93,13 +102,20 @@ func (h *Handler) updateGenre(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение жанра")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение жанра",
+		Date:    time.Now(),
+		Details: "Изменение жанра ID: " + fmt.Sprintf("%d", input.ID),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -121,13 +137,20 @@ func (h *Handler) deleteGenre(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление жанра")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Удаление жанра",
+		Date:    time.Now(),
+		Details: "Удаление жанра ID: " + c.Param("id"),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -157,13 +180,20 @@ func (h *Handler) exportGenresToCSV(c *gin.Context) {
 
 	c.Data(http.StatusOK, "text/csv", genreData)
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт жанров в CSV")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Экспорт жанров в CSV",
+		Date:    time.Now(),
+		Details: "Экспорт жанров в CSV файл",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}
@@ -206,11 +236,18 @@ func (h *Handler) importGenresFromCSV(c *gin.Context) {
 	}
 
 	// Логируем действие
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 	} else {
-		err = h.service.LogServ.CreateLogWithCookie(cookie, "Импорт жанров из CSV")
+		createLogInput := &service.CreateLogInput{
+			UserID:  userID,
+			Action:  "Импорт жанров из CSV",
+			Date:    time.Now(),
+			Details: fmt.Sprintf("Успешно импортировано %d жанров", count),
+		}
+
+		err = h.service.LogServ.CreateLog(createLogInput)
 		if err != nil {
 			log.Printf("Error creating log: %v", err)
 		}

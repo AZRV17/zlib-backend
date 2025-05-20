@@ -2,11 +2,13 @@ package delivery
 
 import (
 	"fmt"
-	"github.com/AZRV17/zlib-backend/pkg/db/psql"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/AZRV17/zlib-backend/pkg/db/psql"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initBackupRoutes(r *gin.Engine) {
@@ -52,13 +54,20 @@ func (h *Handler) createBackup(c *gin.Context) {
 	c.Data(http.StatusOK, "application/octet-stream", backupData)
 
 	// Логируем действие
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание бэкапа")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Создание бэкапа",
+		Date:    time.Now(),
+		Details: "Создание бэкапа базы данных",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}
@@ -91,13 +100,20 @@ func (h *Handler) restoreBackup(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Восстановление бд")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Восстановление бд",
+		Date:    time.Now(),
+		Details: "Восстановление базы данных из бэкапа",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

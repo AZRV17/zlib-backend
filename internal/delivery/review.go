@@ -1,8 +1,10 @@
 package delivery
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/AZRV17/zlib-backend/internal/service"
 	"github.com/gin-gonic/gin"
@@ -30,30 +32,14 @@ func (h *Handler) createReview(c *gin.Context) {
 		return
 	}
 
-	userID, err := c.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userIDInt, err := strconv.Atoi(userID)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userIDInt == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
 	serviceCreateReviewInput := &service.CreateReviewInput{
-		UserID:  uint(userIDInt), //nolint:gosec
+		UserID:  userID,
 		BookID:  input.BookID,
 		Rating:  input.Rating,
 		Message: input.Message,
@@ -65,13 +51,14 @@ func (h *Handler) createReview(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Добавление отзыва",
+		Date:    time.Now(),
+		Details: fmt.Sprintf("Добавление отзыва к книге ID: %d", input.BookID),
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Добавление отзыва")
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

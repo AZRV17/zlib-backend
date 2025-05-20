@@ -3,21 +3,21 @@ package app
 import (
 	"errors"
 	"fmt"
-	"github.com/AZRV17/zlib-backend/internal/config"
-	"github.com/AZRV17/zlib-backend/internal/delivery"
-	"github.com/AZRV17/zlib-backend/internal/repository"
-	httpserver "github.com/AZRV17/zlib-backend/internal/server/http"
-	"github.com/AZRV17/zlib-backend/internal/server/metrics"
-	ws "github.com/AZRV17/zlib-backend/internal/server/websocket"
-	serv "github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/AZRV17/zlib-backend/pkg/db/psql"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/config"
+	"github.com/AZRV17/zlib-backend/internal/delivery"
+	"github.com/AZRV17/zlib-backend/internal/repository"
+	httpserver "github.com/AZRV17/zlib-backend/internal/server/http"
+	ws "github.com/AZRV17/zlib-backend/internal/server/websocket"
+	serv "github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/AZRV17/zlib-backend/pkg/db/psql"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 //nolint:funlen
@@ -50,9 +50,9 @@ func Run() {
 		cors.New(
 			cors.Config{
 				AllowOrigins:     []string{"http://localhost:3000"},
-				AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Set-Cookie"},
-				AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-				ExposeHeaders:    []string{"Content-Length"},
+				AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Set-Cookie", "Accept"},
+				AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+				ExposeHeaders:    []string{"Content-Length", "Content-Type", "Authorization"},
 				AllowWildcard:    true,
 				AllowCredentials: true,
 				MaxAge:           12 * time.Hour,
@@ -77,9 +77,6 @@ func Run() {
 	handler.Init(r)
 
 	server := httpserver.NewHTTPServer(cfg, r)
-
-	metrics.InitInfluxDB()
-	defer metrics.CloseInfluxDB()
 
 	stoppedHTTP := make(chan struct{})
 

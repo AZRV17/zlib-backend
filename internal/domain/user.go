@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"crypto/sha256"
 	"database/sql/driver"
 	"fmt"
 	"time"
@@ -47,4 +48,12 @@ type User struct {
 	ResetTokenExpiry   time.Time     `json:"-"`
 	CreatedAt          time.Time     `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt          time.Time     `json:"updatedAt" gorm:"autoUpdateTime"`
+}
+
+// CheckPassword проверяет правильность пароля пользователя
+func (u *User) CheckPassword(password string) bool {
+	// Здесь должна быть ваша логика проверки пароля
+	// В данном примере, предполагается, что пароль хранится в виде sha256 хеша
+	hashedPassword := fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
+	return u.Password == hashedPassword
 }

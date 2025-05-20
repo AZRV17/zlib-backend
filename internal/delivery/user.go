@@ -1,36 +1,200 @@
 package delivery
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/domain"
-	"github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/domain"
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/AZRV17/zlib-backend/pkg/auth"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initUserRoutes(r *gin.Engine) {
 	users := r.Group("/users")
 	{
+		// Маршруты для авторизации
+		users.POST("/sign-in-by-login", h.signInByLogin)
+		users.POST("/sign-in-by-email", h.signInByEmail)
+		users.POST("/sign-up", h.signUp)
+		users.POST("/refresh", h.refreshTokens)
+		users.POST("/logout", h.logout)
+
 		// Маршруты для восстановления пароля
 		users.POST("/forgot-password", h.requestPasswordReset)
 		users.GET("/reset-password", h.validateResetToken)
 		users.POST("/reset-password", h.resetPassword)
 
-		users.POST("/sign-up", h.signUp)
-		users.POST("/sign-in-by-login", h.signInByLogin)
-		users.POST("/sign-in-by-email", h.signInByEmail)
-		users.GET("/:id", h.getUserByID)
-		users.GET("/", h.getAllUsers)
-		users.PUT("/:id", h.updateUser)
-		users.GET("/cookie", h.getUserByCookie)
-		users.PATCH("/cookie", h.updateUserByCookie)
-		users.POST("/logout", h.logout)
-		users.DELETE("/:id", h.deleteUser)
-		users.DELETE("/cookie", h.deleteUserByCookie)
-		users.Use(h.AuthMiddleware, h.AdminMiddleware).PATCH("/change-role", h.updateUserRole)
+		// Маршруты с авторизацией
+		authorized := users.Group("/")
+		authorized.Use(h.AuthMiddleware)
+		{
+			authorized.GET("/me", h.getUserMe)
+			authorized.PUT("/me", h.updateUserMe)
+			authorized.PATCH("/me/email", h.updateUserMeEmail)
+			authorized.DELETE("/me", h.deleteUserMe)
+		}
+
+		// Админские маршруты
+		admin := users.Group("/")
+		admin.Use(h.AuthMiddleware, h.AdminMiddleware)
+		{
+			admin.GET("/", h.getAllUsers)
+			admin.GET("/:id", h.getUserByID)
+			admin.PUT("/:id", h.updateUser)
+			admin.DELETE("/:id", h.deleteUser)
+			admin.PATCH("/change-role", h.updateUserRole)
+		}
 	}
+}
+
+// Вспомогательные функции для авторизации
+func getTokenFromHeader(c *gin.Context) (string, error) {
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		return "", Unauthorized("пустой заголовок Authorization")
+	}
+
+	headerParts := strings.Split(header, " ")
+	if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+		return "", Unauthorized("неверный формат токена авторизации")
+	}
+
+	return headerParts[1], nil
+}
+
+func Unauthorized(message string) error {
+	return &AuthError{
+		Message: message,
+		Status:  http.StatusUnauthorized,
+	}
+}
+
+type AuthError struct {
+	Message string
+	Status  int
+}
+
+func (e *AuthError) Error() string {
+	return e.Message
+}
+
+// Методы авторизации
+type signInByLoginInput struct {
+	Login    string `json:"login" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func (h *Handler) signInByLogin(c *gin.Context) {
+	var input signInByLoginInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, tokens, err := h.service.UserServ.SignInByLogin(input.Login, input.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Устанавливаем JWT в куки
+	setAuthCookies(c, tokens)
+
+	c.JSON(
+		http.StatusOK, gin.H{
+			"user": user,
+		},
+	)
+}
+
+type signInByEmailInput struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
+func (h *Handler) signInByEmail(c *gin.Context) {
+	var input signInByEmailInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, tokens, err := h.service.UserServ.SignInByEmail(input.Email, input.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Устанавливаем JWT в куки
+	setAuthCookies(c, tokens)
+
+	c.JSON(
+		http.StatusOK, gin.H{
+			"user": user,
+		},
+	)
+}
+
+func (h *Handler) refreshTokens(c *gin.Context) {
+	// Получаем refresh token из куков
+	refreshTokenCookie, err := c.Cookie("refresh_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token not found"})
+		return
+	}
+
+	tokens, err := h.service.UserServ.RefreshTokens(refreshTokenCookie)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Устанавливаем новые JWT в куки
+	setAuthCookies(c, tokens)
+
+	c.JSON(http.StatusOK, gin.H{"message": "tokens refreshed successfully"})
+}
+
+func (h *Handler) logout(c *gin.Context) {
+	// Удаляем куки, устанавливая время жизни в прошлое
+	clearAuthCookies(c)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Вы успешно вышли из системы"})
+}
+
+// Вспомогательная функция для установки JWT токенов в куки
+func setAuthCookies(c *gin.Context, tokens *auth.Tokens) {
+	c.SetCookie(
+		"access_token",
+		tokens.AccessToken,
+		int(time.Hour.Seconds()*24),
+		"/",
+		"",
+		true,
+		true,
+	)
+
+	c.SetCookie(
+		"refresh_token",
+		tokens.RefreshToken,
+		int(time.Hour.Seconds()*24*30), // 30 дней
+		"/",
+		"",
+		true,
+		true,
+	)
+}
+
+// Вспомогательная функция для удаления JWT токенов из куков
+func clearAuthCookies(c *gin.Context) {
+	c.SetCookie("access_token", "", -1, "/", "", true, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 }
 
 type signUpInput struct {
@@ -77,74 +241,6 @@ func (h *Handler) signUp(c *gin.Context) {
 	c.JSON(http.StatusOK, newUser)
 }
 
-type signInByLoginInput struct {
-	Login    string `json:"login" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-func (h *Handler) signInByLogin(c *gin.Context) {
-	var input signInByLoginInput
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	user, err := h.service.UserServ.SignInByLogin(input.Login, input.Password)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	http.SetCookie(
-		c.Writer, &http.Cookie{
-			Name:     "id",
-			Value:    strconv.Itoa(int(user.ID)), //nolint:gosec
-			Expires:  time.Now().Add(24 * time.Hour),
-			Path:     "/",
-			Secure:   false,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		},
-	)
-
-	c.JSON(http.StatusOK, user)
-}
-
-type signInByEmailInput struct {
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-func (h *Handler) signInByEmail(c *gin.Context) {
-	var input signInByEmailInput
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	user, err := h.service.UserServ.SignInByEmail(input.Email, input.Password)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	http.SetCookie(
-		c.Writer, &http.Cookie{
-			Name:     "id",
-			Value:    strconv.Itoa(int(user.ID)), //nolint:gosec
-			Expires:  time.Now().Add(24 * time.Hour),
-			Path:     "/",
-			Secure:   false,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		},
-	)
-
-	c.JSON(http.StatusOK, user)
-}
-
 type updateUserInput struct {
 	ID             uint        `json:"id" gorm:"primaryKey,autoIncrement"`
 	Login          string      `json:"login" gore:"unique"`
@@ -161,6 +257,7 @@ func (h *Handler) updateUser(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	user, err := h.service.UserServ.GetUserByID(input.ID)
@@ -181,6 +278,7 @@ func (h *Handler) updateUser(c *gin.Context) {
 
 	if err := h.service.UserServ.UpdateUser(&servInput); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
@@ -212,30 +310,15 @@ func (h *Handler) getAllUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-func (h *Handler) getUserByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+// getUserMe возвращает информацию о текущем пользователе по JWT токену
+func (h *Handler) getUserMe(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	user, err := h.service.UserServ.GetUserByID(uint(userID)) //nolint:gosec
+	user, err := h.service.UserServ.GetUserByID(userID)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -244,42 +327,11 @@ func (h *Handler) getUserByCookie(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *Handler) logout(c *gin.Context) {
-	http.SetCookie(
-		c.Writer, &http.Cookie{
-			Name:     "id",
-			Value:    "0", //nolint:gosec
-			Path:     "/", // Убедитесь, что Path совпадает
-			MaxAge:   -1,  // MaxAge=-1 означает немедленное удаление
-			Secure:   false,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		},
-	)
-
-	c.JSON(http.StatusOK, gin.H{"message": "user logged out"})
-}
-
-func (h *Handler) updateUserByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+// updateUserMe обновляет данные текущего пользователя
+func (h *Handler) updateUserMe(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -289,12 +341,13 @@ func (h *Handler) updateUserByCookie(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.UserServ.GetUserByID(uint(userID)) //nolint:gosec
+	user, err := h.service.UserServ.GetUserByID(userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Не позволяем менять роль через этот метод
 	servInput := service.UpdateUserInput{
 		ID:             user.ID,
 		Login:          input.Login,
@@ -308,6 +361,51 @@ func (h *Handler) updateUserByCookie(c *gin.Context) {
 
 	if err := h.service.UserServ.UpdateUser(&servInput); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
+}
+
+type updateUserEmailInput struct {
+	UserId int    `json:"user_id"`
+	Email  string `json:"email"`
+}
+
+func (h *Handler) updateUserMeEmail(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var input updateUserEmailInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.service.UserServ.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Не позволяем менять роль через этот метод
+	servInput := service.UpdateUserInput{
+		ID:             user.ID,
+		Login:          user.Login,
+		FullName:       user.FullName,
+		Password:       user.Password,
+		Role:           user.Role,
+		Email:          input.Email,
+		PhoneNumber:    user.PhoneNumber,
+		PassportNumber: user.PassportNumber,
+	}
+
+	if err := h.service.UserServ.UpdateUser(&servInput); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
@@ -331,13 +429,20 @@ func (h *Handler) updateUserRole(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение роли пользователя")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение роли пользователя",
+		Date:    time.Now(),
+		Details: "Изменение роли пользователя",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -358,13 +463,20 @@ func (h *Handler) deleteUser(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	adminID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление пользователя")
+	createLogInput := &service.CreateLogInput{
+		UserID:  adminID,
+		Action:  "Удаление пользователя",
+		Date:    time.Now(),
+		Details: "Удаление пользователя с ID: " + c.Param("id"),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -373,30 +485,15 @@ func (h *Handler) deleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
 }
 
-func (h *Handler) deleteUserByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+// deleteUserMe удаляет текущего пользователя
+func (h *Handler) deleteUserMe(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	if err := h.service.UserServ.DeleteUser(uint(userID)); err != nil {
+	if err := h.service.UserServ.DeleteUser(userID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

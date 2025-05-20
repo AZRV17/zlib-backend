@@ -2,13 +2,15 @@ package delivery
 
 import (
 	"fmt"
-	"github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/gin-gonic/gin"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initPublisherRoutes(r *gin.Engine) {
@@ -63,13 +65,20 @@ func (h *Handler) deletePublisher(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление издателя")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Удаление издателя",
+		Date:    time.Now(),
+		Details: "Удаление издателя с ID: " + c.Param("id"),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -92,13 +101,20 @@ func (h *Handler) updatePublisher(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение издателя")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение издателя",
+		Date:    time.Now(),
+		Details: "Изменение издателя с ID: " + fmt.Sprintf("%d", input.ID),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -121,13 +137,20 @@ func (h *Handler) createPublisher(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание издателя")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Создание издателя",
+		Date:    time.Now(),
+		Details: "Создание издателя: " + input.Name,
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -157,13 +180,20 @@ func (h *Handler) exportPublishersToCSV(c *gin.Context) {
 
 	c.Data(http.StatusOK, "text/csv", publisherData)
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт издательств в CSV")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Экспорт издательств в CSV",
+		Date:    time.Now(),
+		Details: "Экспорт издательств в CSV файл",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}
@@ -206,11 +236,18 @@ func (h *Handler) importPublishersFromCSV(c *gin.Context) {
 	}
 
 	// Логируем действие
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 	} else {
-		err = h.service.LogServ.CreateLogWithCookie(cookie, "Импорт издательств из CSV")
+		createLogInput := &service.CreateLogInput{
+			UserID:  userID,
+			Action:  "Импорт издательств из CSV",
+			Date:    time.Now(),
+			Details: fmt.Sprintf("Успешно импортировано %d издательств", count),
+		}
+
+		err = h.service.LogServ.CreateLog(createLogInput)
 		if err != nil {
 			log.Printf("Error creating log: %v", err)
 		}

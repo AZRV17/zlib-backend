@@ -2,16 +2,19 @@ package delivery
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initReservationRoutes(r *gin.Engine) {
 	reservations := r.Group("/reservations")
 	{
-		reservations.Use(h.AuthMiddleware).GET("/cookie", h.getUserReservations)
+		reservations.Use(h.AuthMiddleware).GET("/my", h.getUserReservations)
 		reservations.Use(h.AuthMiddleware).GET("/:id", h.getReservationByID)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).GET("/", h.getAllReservations)
 		reservations.Use(h.AuthMiddleware, h.LibrarianMiddleware).PATCH("/:id", h.updateReservationStatus)
@@ -21,29 +24,13 @@ func (h *Handler) initReservationRoutes(r *gin.Engine) {
 }
 
 func (h *Handler) getUserReservations(c *gin.Context) {
-	userID, err := c.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userIDInt, err := strconv.Atoi(userID)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userIDInt == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	reservations, err := h.service.ReservationServ.GetReservationsByUserID(uint(userIDInt)) //nolint:gosec
+	reservations, err := h.service.ReservationServ.GetReservationsByUserID(userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -96,14 +83,25 @@ func (h *Handler) updateReservationStatus(c *gin.Context) {
 	}
 
 	err = h.service.ReservationServ.UpdateReservationStatus(uint(reservationID), input.Status) //nolint:gosec
-
-	cookie, err := c.Request.Cookie("id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение статуса бронирования")
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение статуса бронирования",
+		Date:    time.Now(),
+		Details: "Изменение статуса бронирования: " + input.Status,
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -133,13 +131,20 @@ func (h *Handler) exportReservationsToCSV(c *gin.Context) {
 
 	c.Data(http.StatusOK, "text/csv", reservationData)
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		log.Printf("Error getting cookie for logging: %v", err)
+		log.Printf("Error getting user ID for logging: %v", err)
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Экспорт бронирований в CSV")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Экспорт бронирований в CSV",
+		Date:    time.Now(),
+		Details: "Экспорт бронирований в CSV файл",
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		log.Printf("Error creating log: %v", err)
 	}

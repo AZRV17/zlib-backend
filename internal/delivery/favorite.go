@@ -1,73 +1,48 @@
 package delivery
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/service"
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initFavoriteRoutes(r *gin.Engine) {
 	favorites := r.Group("/favorites")
 	{
-		favorites.Use(h.AuthMiddleware).GET("/cookie", h.getFavoritesByUserIDByCookie)
-		favorites.Use(h.AuthMiddleware).DELETE("/cookie/:id", h.deleteFavoriteByUserIDByCookie)
-		favorites.Use(h.AuthMiddleware).POST("/cookie", h.createFavoriteByUserIDByCookie)
+
+		favorites.Use(h.AuthMiddleware)
+		{
+			favorites.GET("/", h.getFavoritesByUserID)
+			favorites.DELETE("/:id", h.deleteFavoriteByBookID)
+			favorites.POST("/", h.createFavorite)
+		}
 	}
 }
 
-func (h *Handler) getFavoritesByUserIDByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+func (h *Handler) getFavoritesByUserID(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "не удалось получить ID пользователя: " + err.Error()})
 		return
 	}
 
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
+	favorites, err := h.service.FavoriteServ.GetFavoriteByUserID(userID)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	favorites, err := h.service.FavoriteServ.GetFavoriteByUserID(uint(userID)) //nolint:gosec
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка получения избранного: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, favorites)
 }
 
-func (h *Handler) deleteFavoriteByUserIDByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+func (h *Handler) deleteFavoriteByBookID(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -77,13 +52,20 @@ func (h *Handler) deleteFavoriteByUserIDByCookie(c *gin.Context) {
 		return
 	}
 
-	favorite, err := h.service.FavoriteServ.DeleteFavoriteByUserIDAndBookID(uint(userID), uint(bookID))
+	favorite, err := h.service.FavoriteServ.DeleteFavoriteByUserIDAndBookID(userID, uint(bookID))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление из избранного")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Удаление из избранного",
+		Date:    time.Now(),
+		Details: fmt.Sprintf("Удаление книги %d из избранного", bookID),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -96,51 +78,43 @@ type createFavoriteInput struct {
 	BookID uint `json:"book_id" binding:"required"`
 }
 
-func (h *Handler) createFavoriteByUserIDByCookie(c *gin.Context) {
-	cookie, err := c.Request.Cookie("id")
+func (h *Handler) createFavorite(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if cookie.Value == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-
-	userID, err := strconv.Atoi(cookie.Value)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "не удалось получить ID пользователя: " + err.Error()})
 		return
 	}
 
 	var input createFavoriteInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат данных: " + err.Error()})
 		return
 	}
 
 	err = h.service.FavoriteServ.CreateFavorite(
 		&service.CreateFavoriteInput{
 			BookID: input.BookID,
-			UserID: uint(userID), //nolint:gosec
+			UserID: userID,
 		},
 	)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка добавления в избранное: " + err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Добавление книги в избранное")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Добавление книги в избранное",
+		Date:    time.Now(),
+		Details: fmt.Sprintf("Добавление книги %d в избранное", input.BookID),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Важно вернуть правильный статус-код (не 307)
 	c.JSON(http.StatusOK, gin.H{"message": "book added to favorites"})
 }

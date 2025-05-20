@@ -1,10 +1,13 @@
 package delivery
 
 import (
-	"github.com/AZRV17/zlib-backend/internal/domain"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/AZRV17/zlib-backend/internal/domain"
+	"github.com/AZRV17/zlib-backend/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initUniqueCodeRoutes(r *gin.Engine) {
@@ -69,13 +72,20 @@ func (h *Handler) createUniqueCode(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Создание уникального кода")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Создание уникального кода",
+		Date:    time.Now(),
+		Details: "Создание уникального кода для книги ID: " + strconv.Itoa(int(input.BookID)),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -97,13 +107,20 @@ func (h *Handler) deleteUniqueCode(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Удаление уникального кода")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Удаление уникального кода",
+		Date:    time.Now(),
+		Details: "Удаление уникального кода ID: " + c.Param("id"),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -139,13 +156,20 @@ func (h *Handler) updateUniqueCode(c *gin.Context) {
 		return
 	}
 
-	cookie, err := c.Request.Cookie("id")
+	userID, err := getUserIDFromContext(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.service.LogServ.CreateLogWithCookie(cookie, "Изменение уникального кода")
+	createLogInput := &service.CreateLogInput{
+		UserID:  userID,
+		Action:  "Изменение уникального кода",
+		Date:    time.Now(),
+		Details: "Изменение уникального кода ID: " + strconv.Itoa(int(input.ID)),
+	}
+
+	err = h.service.LogServ.CreateLog(createLogInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

@@ -22,9 +22,6 @@ func NewHandler(service service.Service, cfg *config.Config, chatHub *websocket.
 }
 
 func (h *Handler) Init(r *gin.Engine) {
-	// WebSocket маршрут должен быть инициализирован до остальных маршрутов
-	r.GET("/ws", h.chatHub.HandleConnections)
-
 	h.initUserRoutes(r)
 	h.initBookRoutes(r)
 	h.initPublisherRoutes(r)
@@ -37,4 +34,6 @@ func (h *Handler) Init(r *gin.Engine) {
 	h.initBackupRoutes(r)
 	h.initLogRoutes(r)
 	h.initChatRoutes(r)
+
+	r.Use(h.AuthMiddleware).GET("/ws", h.chatHub.HandleConnections)
 }

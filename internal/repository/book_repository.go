@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"gorm.io/gorm"
@@ -478,6 +479,197 @@ func (b BookRepository) FindBooks(limit int, offset int, query string) ([]*domai
 		).
 		Preload("Author").Preload("Genre").Preload("Publisher").
 		Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return books, nil
+}
+
+func (b BookRepository) CountBooksMatchingSearch(query string) (int, error) {
+	var count int64
+	tx := b.DB.Begin()
+
+	if err := tx.Model(&domain.Book{}).
+		Joins("JOIN authors ON books.author_id = authors.id").
+		Where(
+			"lower(books.title) LIKE lower(?) OR lower(authors.name) LIKE lower(?) OR lower(authors.lastname) LIKE lower(?)",
+			"%"+query+"%", "%"+query+"%", "%"+query+"%",
+		).
+		Count(&count).Error; err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+func (b BookRepository) FindBooksWithFilters(
+	limit int,
+	offset int,
+	query string,
+	authorID uint,
+	genreID uint,
+	yearStart, yearEnd time.Time,
+	sortBy string,
+	sortOrder string,
+) ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	tx := b.DB.Begin()
+	db := tx.Model(&domain.Book{}).Preload("Author").Preload("Genre").Preload("Publisher")
+
+	// Применяем фильтры, если они указаны
+	if query != "" {
+		// Попробуем преобразовать запрос в число для поиска по ISBN
+		var isbn int
+		if _, err := fmt.Sscanf(query, "%d", &isbn); err == nil {
+			db = db.Where("isbn = ?", isbn)
+		} else {
+			db = db.Joins("JOIN authors ON books.author_id = authors.id").
+				Where(
+					"lower(books.title) LIKE lower(?) OR lower(authors.name) LIKE lower(?) OR lower(authors.lastname) LIKE lower(?)",
+					"%"+query+"%", "%"+query+"%", "%"+query+"%",
+				)
+		}
+	}
+
+	if authorID > 0 {
+		db = db.Where("author_id = ?", authorID)
+	}
+
+	if genreID > 0 {
+		db = db.Where("genre_id = ?", genreID)
+	}
+
+	// Фильтр по диапазону дат (если даты установлены)
+	defaultTime := time.Time{}
+	if yearStart != defaultTime {
+		db = db.Where("year_of_publication >= ?", yearStart)
+	}
+	if yearEnd != defaultTime {
+		db = db.Where("year_of_publication <= ?", yearEnd)
+	}
+
+	// Применяем сортировку
+	if sortBy != "" {
+		if sortOrder != "asc" && sortOrder != "desc" {
+			sortOrder = "asc" // По умолчанию сортируем по возрастанию
+		}
+
+		switch sortBy {
+		case "title":
+			db = db.Order("books.title " + sortOrder)
+		case "rating":
+			db = db.Order("books.rating " + sortOrder)
+		case "year":
+			db = db.Order("books.year_of_publication " + sortOrder)
+		default:
+			db = db.Order("books.id " + sortOrder) // По умолчанию сортируем по ID
+		}
+	}
+
+	// Применяем пагинацию
+	if err := db.Limit(limit).Offset(offset).Find(&books).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return books, nil
+}
+
+func (b BookRepository) CountBooksWithFilters(
+	query string,
+	authorID uint,
+	genreID uint,
+	yearStart, yearEnd time.Time,
+) (int, error) {
+	var count int64
+
+	tx := b.DB.Begin()
+	db := tx.Model(&domain.Book{})
+
+	// Применяем фильтры, если они указаны
+	if query != "" {
+		var isbn int
+		if _, err := fmt.Sscanf(query, "%d", &isbn); err == nil {
+			db = db.Where("isbn = ?", isbn)
+		} else {
+			db = db.Joins("JOIN authors ON books.author_id = authors.id").
+				Where(
+					"lower(books.title) LIKE lower(?) OR lower(authors.name) LIKE lower(?) OR lower(authors.lastname) LIKE lower(?)",
+					"%"+query+"%", "%"+query+"%", "%"+query+"%",
+				)
+		}
+	}
+
+	if authorID > 0 {
+		db = db.Where("author_id = ?", authorID)
+	}
+
+	if genreID > 0 {
+		db = db.Where("genre_id = ?", genreID)
+	}
+
+	// Фильтр по диапазону дат
+	defaultTime := time.Time{}
+	if yearStart != defaultTime {
+		db = db.Where("year_of_publication >= ?", yearStart)
+	}
+	if yearEnd != defaultTime {
+		db = db.Where("year_of_publication <= ?", yearEnd)
+	}
+
+	if err := db.Count(&count).Error; err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	err := tx.Commit().Error
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+func (b BookRepository) GetTopBooksByReservations(limit int, periodMonths int) ([]*domain.Book, error) {
+	var books []*domain.Book
+
+	// Вычисляем дату начала периода (например, 3 месяца назад)
+	periodStart := time.Now().AddDate(0, -periodMonths, 0)
+
+	tx := b.DB.Begin()
+
+	// SQL запрос для получения топ-книг по количеству бронирований за указанный период
+	if err := tx.Model(&domain.Book{}).
+		Select("books.*, COUNT(reservations.id) as reservation_count").
+		Joins("JOIN reservations ON books.id = reservations.book_id").
+		Where("reservations.date_of_issue >= ?", periodStart).
+		Group("books.id").
+		Order("reservation_count DESC").
+		Preload("Author").
+		Preload("Genre").
+		Preload("Publisher").
+		Limit(limit).
+		Find(&books).Error; err != nil {
 		tx.Rollback()
 		return nil, err
 	}

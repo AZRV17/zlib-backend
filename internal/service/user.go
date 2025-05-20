@@ -9,45 +9,72 @@ import (
 
 	"github.com/AZRV17/zlib-backend/internal/domain"
 	"github.com/AZRV17/zlib-backend/internal/repository"
+	"github.com/AZRV17/zlib-backend/pkg/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
-	repository repository.UserRepo
-	emailServ  *EmailService
+	repository   repository.UserRepo
+	emailServ    *EmailService
+	tokenManager *auth.TokenManager
 }
 
-func NewUserService(repo repository.UserRepo, emailService *EmailService) *UserService {
+func NewUserService(repo repository.UserRepo, emailService *EmailService, tokenManager *auth.TokenManager) *UserService {
 	return &UserService{
-		repository: repo,
-		emailServ:  emailService,
+		repository:   repo,
+		emailServ:    emailService,
+		tokenManager: tokenManager,
 	}
 }
 
-func (u UserService) SignInByLogin(login, password string) (*domain.User, error) {
+// SignInByLogin - метод для авторизации по логину с JWT
+func (u UserService) SignInByLogin(login, password string) (*domain.User, *auth.Tokens, error) {
 	user, err := u.repository.GetUserByLogin(login)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !u.comparePasswords(user.Password, password) {
-		return nil, fmt.Errorf("invalid password")
+		return nil, nil, fmt.Errorf("неверный пароль")
 	}
 
-	return user, nil
+	// Генерация JWT токенов
+	tokens, err := u.tokenManager.GenerateTokens(user.ID, string(user.Role))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, tokens, nil
 }
 
-func (u UserService) SignInByEmail(email, password string) (*domain.User, error) {
+// SignInByEmail - метод для авторизации по email с JWT
+func (u UserService) SignInByEmail(email, password string) (*domain.User, *auth.Tokens, error) {
 	user, err := u.repository.GetUserByEmail(email)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !u.comparePasswords(user.Password, password) {
-		return nil, fmt.Errorf("invalid password")
+		return nil, nil, fmt.Errorf("неверный пароль")
 	}
 
-	return user, nil
+	// Генерация JWT токенов
+	tokens, err := u.tokenManager.GenerateTokens(user.ID, string(user.Role))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, tokens, nil
+}
+
+// RefreshTokens - обновление JWT токенов
+func (u UserService) RefreshTokens(refreshToken string) (*auth.Tokens, error) {
+	return u.tokenManager.RefreshTokens(refreshToken)
+}
+
+// ParseToken - разбор JWT токена
+func (u UserService) ParseToken(token string) (*auth.TokenClaims, error) {
+	return u.tokenManager.ParseToken(token)
 }
 
 func (u UserService) SignUp(userInput *SignUpUserInput) error {

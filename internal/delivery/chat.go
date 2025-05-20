@@ -2,10 +2,11 @@ package delivery
 
 import (
 	"fmt"
-	"github.com/AZRV17/zlib-backend/internal/domain"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
+	"github.com/AZRV17/zlib-backend/internal/domain"
+	"github.com/gin-gonic/gin"
 )
 
 func (h *Handler) initChatRoutes(r *gin.Engine) {
@@ -190,17 +191,8 @@ func ParseUintParam(c *gin.Context, param string) (uint, error) {
 }
 
 func (h *Handler) getUserIDFromCookie(c *gin.Context) (uint, error) {
-	idCookie, err := c.Cookie("id")
-	if err != nil {
-		return 0, fmt.Errorf("cookie id не найден: %w", err)
-	}
-
-	userID, err := strconv.ParseUint(idCookie, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("некорректный ID в cookie: %w", err)
-	}
-
-	return uint(userID), nil
+	// Заменяем получение ID из cookie на получение из JWT токена
+	return getUserIDFromContext(c)
 }
 
 // Получение чатов, назначенных библиотекарю

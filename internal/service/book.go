@@ -25,6 +25,27 @@ type BookService struct {
 	db              *gorm.DB
 }
 
+func (b BookService) CountAllBooks() (int, error) {
+	books, err := b.bookRepo.GetBooks()
+	if err != nil {
+		return 0, err
+	}
+	return len(books), nil
+}
+
+func (b BookService) CountBooksMatchingSearch(query string) (int, error) {
+	return b.bookRepo.CountBooksMatchingSearch(query)
+}
+
+func (b BookService) CountBooksMatchingTitle(title string) (int, error) {
+	// Получаем все книги с заданным заголовком
+	books, err := b.bookRepo.FindBookByTitle(1000000, 0, title) // Используем большой лимит для получения всех книг
+	if err != nil {
+		return 0, err
+	}
+	return len(books), nil
+}
+
 func NewBookService(
 	bookRepo repository.BookRepo,
 	reservationRepo repository.ReservationRepo,
@@ -468,4 +489,58 @@ func (b BookService) ImportBooksFromCSV(data []byte) (int, error) {
 	}
 
 	return importedCount, nil
+}
+
+func (b *BookService) FindBooksWithFilters(
+	limit int,
+	offset int,
+	query string,
+	authorID uint,
+	genreID uint,
+	yearStart, yearEnd time.Time,
+	sortBy string,
+	sortOrder string,
+) ([]*domain.Book, error) {
+	books, err := b.bookRepo.FindBooksWithFilters(limit, offset, query, authorID, genreID, yearStart, yearEnd, sortBy, sortOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	// Добавляем префикс к путям изображений, если они есть и не начинаются с http
+	for _, book := range books {
+		if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+			continue
+		}
+
+		book.Picture = "http://localhost:8080/" + book.Picture
+	}
+
+	return books, nil
+}
+
+func (b *BookService) CountBooksWithFilters(
+	query string,
+	authorID uint,
+	genreID uint,
+	yearStart, yearEnd time.Time,
+) (int, error) {
+	return b.bookRepo.CountBooksWithFilters(query, authorID, genreID, yearStart, yearEnd)
+}
+
+func (b BookService) GetTopBooksByReservations(limit int, periodMonths int) ([]*domain.Book, error) {
+	books, err := b.bookRepo.GetTopBooksByReservations(limit, periodMonths)
+	if err != nil {
+		return nil, err
+	}
+
+	// Добавляем префикс к путям изображений
+	for _, book := range books {
+		if book.Picture == "" || strings.HasPrefix(book.Picture, "http") {
+			continue
+		}
+
+		book.Picture = "http://localhost:8080/" + book.Picture
+	}
+
+	return books, nil
 }

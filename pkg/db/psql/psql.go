@@ -3,13 +3,14 @@ package psql
 import (
 	"bytes"
 	"fmt"
-	"github.com/AZRV17/zlib-backend/internal/domain"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 	"io"
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/AZRV17/zlib-backend/internal/domain"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
@@ -59,9 +60,9 @@ func Connect(dsn string) error {
     RETURNS TABLE(id INT, role TEXT) AS $$
     BEGIN
         RETURN QUERY
-        SELECT id, role
+        SELECT users.id, users.role
         FROM users
-        WHERE login = login AND password = crypt(pass, password);
+        WHERE users.login = login AND users.password = crypt(pass, users.password);
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Invalid login or password';

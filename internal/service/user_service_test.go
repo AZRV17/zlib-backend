@@ -86,7 +86,7 @@ func (m *MockUserRepo) SignUp(user *domain.User) error {
 
 func TestUserService_SignInByLogin(t *testing.T) {
 	mockRepo := new(MockUserRepo)
-	userService := NewUserService(mockRepo, nil)
+	userService := NewUserService(mockRepo, nil, nil)
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 
@@ -99,7 +99,7 @@ func TestUserService_SignInByLogin(t *testing.T) {
 
 	t.Run(
 		"valid login", func(t *testing.T) {
-			user, err := userService.SignInByLogin("testuser", "password")
+			user, _, err := userService.SignInByLogin("testuser", "password")
 			assert.NoError(t, err)
 			assert.NotNil(t, user)
 			assert.Equal(t, "testuser", user.Login)
@@ -108,9 +108,9 @@ func TestUserService_SignInByLogin(t *testing.T) {
 
 	t.Run(
 		"invalid password", func(t *testing.T) {
-			_, err := userService.SignInByLogin("testuser", "wrongpassword")
+			_, _, err := userService.SignInByLogin("testuser", "wrongpassword")
 			assert.Error(t, err)
-			assert.Equal(t, "invalid password", err.Error())
+			assert.Equal(t, "неверный пароль", err.Error())
 		},
 	)
 
@@ -118,7 +118,7 @@ func TestUserService_SignInByLogin(t *testing.T) {
 		"user not found", func(t *testing.T) {
 			mockRepo.On("GetUserByLogin", "unknownuser").
 				Return(nil, errors.New("user not found"))
-			_, err := userService.SignInByLogin("unknownuser", "password")
+			_, _, err := userService.SignInByLogin("unknownuser", "password")
 			assert.Error(t, err)
 			assert.Equal(t, "user not found", err.Error())
 		},
@@ -129,7 +129,7 @@ func TestUserService_SignUp(t *testing.T) {
 	t.Run(
 		"successful signup", func(t *testing.T) {
 			mockRepo := new(MockUserRepo)
-			userService := NewUserService(mockRepo, nil)
+			userService := NewUserService(mockRepo, nil, nil)
 
 			mockInput := &SignUpUserInput{
 				Login:    "newuser",
@@ -147,7 +147,7 @@ func TestUserService_SignUp(t *testing.T) {
 	t.Run(
 		"signup error", func(t *testing.T) {
 			mockRepo := new(MockUserRepo)
-			userService := NewUserService(mockRepo, nil)
+			userService := NewUserService(mockRepo, nil, nil)
 
 			mockInput := &SignUpUserInput{
 				Login:    "newuser",
